@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>AesiaLux — Word Processor</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<!-- docx.js for .docx export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+  :root {
+    --chrome: #2b2b2e;
+    --chrome-light: #3a3a3e;
+    --chrome-border: #1a1a1c;
+    --accent: #c8a96e;
+    --accent-dim: rgba(200,169,110,0.15);
+    --page-bg: #faf9f6;
+    --toolbar-h: 44px;
+    --menubar-h: 32px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#1e1e21; font-family:'EB Garamond',serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; user-select:none; }
+
+  /* TITLE BAR */
+  #titlebar { height:36px; background:var(--chrome-border); display:flex; align-items:center; justify-content:space-between; padding:0 16px; flex-shrink:0; border-bottom:1px solid rgba(255,255,255,0.04); }
+  #titlebar-name { font-family:'Playfair Display',serif; font-size:12px; letter-spacing:0.25em; color:var(--accent); text-transform:uppercase; }
+  #titlebar-file { font-family:'DM Mono',monospace; font-size:11px; color:rgba(255,255,255,0.3); }
+  #chaos-hint { font-size:10px; color:rgba(255,255,255,0.12); letter-spacing:0.1em; }
+
+  /* MENU BAR */
+  #menubar { height:var(--menubar-h); background:var(--chrome); display:flex; align-items:center; padding:0 8px; gap:2px; flex-shrink:0; border-bottom:1px solid var(--chrome-border); overflow-x:auto; overflow-y:visible; scrollbar-width:none; }
+  #menubar::-webkit-scrollbar { display:none; }
+  .menu-item { font-size:12px; color:rgba(255,255,255,0.6); padding:4px 10px; border-radius:3px; cursor:pointer; transition:all 0.15s; position:relative; }
+  .menu-item:hover { background:rgba(255,255,255,0.07); color:#fff; }
+  .dropdown { display:none; position:absolute; top:100%; left:0; background:#2f2f33; border:1px solid rgba(255,255,255,0.1); border-radius:4px; min-width:200px; z-index:100; box-shadow:0 8px 24px rgba(0,0,0,0.5); padding:4px 0; }
+  .menu-item:hover .dropdown { display:block; }
+  .dropdown-item { padding:7px 16px; font-size:12px; color:rgba(255,255,255,0.7); cursor:pointer; display:flex; justify-content:space-between; gap:24px; white-space:nowrap; }
+  .dropdown-item:hover { background:var(--accent-dim); color:#fff; }
+  .dropdown-item span { color:rgba(255,255,255,0.25); font-size:11px; }
+  .dropdown-sep { height:1px; background:rgba(255,255,255,0.07); margin:4px 0; }
+  .dropdown-label { padding:5px 16px 3px; font-size:10px; letter-spacing:0.15em; color:rgba(255,255,255,0.25); text-transform:uppercase; }
+
+  /* TOOLBAR */
+  #toolbar { height:var(--toolbar-h); background:var(--chrome-light); display:flex; align-items:center; padding:0 8px; gap:2px; flex-shrink:0; border-bottom:1px solid var(--chrome-border); overflow-x:auto; overflow-y:hidden; white-space:nowrap; scrollbar-width:none; }
+  #toolbar::-webkit-scrollbar { display:none; }
+  .tb-sep { width:1px; height:22px; background:rgba(255,255,255,0.1); margin:0 4px; }
+  .tb-btn { width:30px; height:30px; background:transparent; border:1px solid transparent; border-radius:4px; color:rgba(255,255,255,0.65); cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; transition:all 0.15s; font-family:'EB Garamond',serif; }
+  .tb-btn:hover { background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.1); color:#fff; }
+  .tb-btn.active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+  #font-family-select, #font-size-select { background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:rgba(255,255,255,0.7); padding:4px 8px; font-size:12px; cursor:pointer; outline:none; height:28px; }
+  #font-family-select { width:130px; }
+  #font-size-select { width:58px; }
+  #font-family-select:focus, #font-size-select:focus { border-color:var(--accent); color:#fff; }
+  /* COLOR WHEEL PICKERS */
+  .color-picker-wrap { display:flex; flex-direction:column; align-items:center; gap:2px; position:relative; cursor:pointer; }
+  .color-picker-wrap label { font-size:8px; letter-spacing:0.08em; color:rgba(255,255,255,0.35); text-transform:uppercase; cursor:pointer; }
+  .color-swatch { width:26px; height:26px; border-radius:5px; border:2px solid rgba(255,255,255,0.15); cursor:pointer; transition:border-color 0.15s; position:relative; overflow:hidden; }
+  .color-swatch:hover { border-color:rgba(255,255,255,0.5); }
+  .color-swatch input[type="color"] { position:absolute; inset:-4px; width:calc(100% + 8px); height:calc(100% + 8px); opacity:0; cursor:pointer; border:none; padding:0; }
+  /* checkerboard for the highlight swatch background */
+  .highlight-swatch { background-image: linear-gradient(45deg,#aaa 25%,transparent 25%),linear-gradient(-45deg,#aaa 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#aaa 75%),linear-gradient(-45deg,transparent 75%,#aaa 75%); background-size:6px 6px; background-position:0 0,0 3px,3px -3px,-3px 0; }
+
+  /* SCROLL AREA */
+  #scroll-area { flex:1; overflow-y:auto; overflow-x:auto; background:#27272b; display:flex; justify-content:center; align-items:flex-start; padding:24px 16px 80px; min-height:0; }
+  #scroll-area::-webkit-scrollbar { width:8px; height:8px; }
+  #scroll-area::-webkit-scrollbar-track { background:#1e1e21; }
+  #scroll-area::-webkit-scrollbar-thumb { background:#444; border-radius:4px; }
+
+  /* PAGE */
+  #page { width:min(816px, 100%); min-height:600px; background:var(--page-bg); box-shadow:0 4px 40px rgba(0,0,0,0.35); position:relative; flex-shrink:0; border-radius:2px; }
+  #editor { width:100%; min-height:600px; padding:clamp(32px, 6%, 96px); outline:none; font-family:'EB Garamond',serif; font-size:clamp(12pt, 1.8vw, 14pt); line-height:1.8; color:#1a1a1a; caret-color:#c8610a; user-select:text; }
+  #editor:empty::before { content:'Start typing…'; color:#bbb; pointer-events:none; }
+  #editor h1 { font-family:'Playfair Display',serif; font-size:2.4em; font-weight:700; margin:0.6em 0 0.3em; color:#111; }
+  #editor h2 { font-family:'Playfair Display',serif; font-size:1.7em; font-weight:400; margin:1em 0 0.3em; color:#222; border-bottom:1px solid #ddd; padding-bottom:6px; }
+  #editor h3 { font-family:'Playfair Display',serif; font-size:1.25em; font-weight:700; margin:0.8em 0 0.2em; color:#333; }
+  #editor blockquote { border-left:3px solid var(--accent); padding-left:20px; margin:1em 0; color:#555; font-style:italic; }
+  #editor hr { border:none; border-top:1px solid #ccc; margin:24px 0; }
+
+  /* STATUS BAR */
+  #statusbar { height:24px; background:var(--chrome-border); display:flex; align-items:center; padding:0 16px; gap:20px; flex-shrink:0; border-top:1px solid rgba(255,255,255,0.04); }
+  .status-item { font-family:'DM Mono',monospace; font-size:10px; color:rgba(255,255,255,0.3); letter-spacing:0.05em; }
+  #format-indicator { color:var(--accent); opacity:0.7; }
+
+  /* FORMAT MODAL */
+  #format-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:center; justify-content:center; }
+  #format-modal.open { display:flex; }
+  #format-panel { background:#2a2a2e; border:1px solid rgba(255,255,255,0.1); border-radius:8px; width:680px; max-height:80vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.6); }
+  #format-panel::-webkit-scrollbar { width:6px; }
+  #format-panel::-webkit-scrollbar-thumb { background:#444; border-radius:3px; }
+  .fp-header { padding:20px 24px 16px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; }
+  .fp-title { font-family:'Playfair Display',serif; font-size:18px; color:#fff; }
+  .fp-close { background:none; border:none; color:rgba(255,255,255,0.4); font-size:20px; cursor:pointer; padding:0 4px; }
+  .fp-close:hover { color:#fff; }
+  .fp-tabs { display:flex; padding:0 24px; border-bottom:1px solid rgba(255,255,255,0.08); gap:0; }
+  .fp-tab { padding:12px 18px; font-size:12px; letter-spacing:0.1em; color:rgba(255,255,255,0.4); cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s; }
+  .fp-tab:hover { color:rgba(255,255,255,0.7); }
+  .fp-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .fp-content { padding:24px; display:none; }
+  .fp-content.active { display:block; }
+  .template-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .template-card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:16px; cursor:pointer; transition:all 0.2s; }
+  .template-card:hover { background:rgba(200,169,110,0.08); border-color:rgba(200,169,110,0.3); }
+  .template-card.applied { border-color:var(--accent); background:rgba(200,169,110,0.1); }
+  .tc-name { font-family:'Playfair Display',serif; font-size:14px; color:#fff; margin-bottom:6px; }
+  .tc-desc { font-size:11px; color:rgba(255,255,255,0.4); line-height:1.5; }
+  .tc-preview { margin-top:10px; padding:10px; background:rgba(255,255,255,0.03); border-radius:4px; font-size:10px; color:rgba(255,255,255,0.3); font-style:italic; line-height:1.6; }
+  .fp-section { margin-bottom:20px; }
+  .fp-section-title { font-size:11px; letter-spacing:0.15em; color:rgba(255,255,255,0.3); text-transform:uppercase; margin-bottom:10px; }
+  .fp-row { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+  .fp-label { font-size:12px; color:rgba(255,255,255,0.5); width:120px; flex-shrink:0; }
+  .fp-select { flex:1; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:rgba(255,255,255,0.7); padding:6px 10px; font-size:12px; outline:none; }
+  .fp-select:focus { border-color:var(--accent); }
+  .fp-input { flex:1; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.1); border-radius:4px; color:rgba(255,255,255,0.7); padding:6px 10px; font-size:12px; outline:none; }
+  .fp-input:focus { border-color:var(--accent); }
+  .fp-btn { padding:8px 20px; border-radius:4px; font-size:12px; letter-spacing:0.1em; cursor:pointer; transition:all 0.2s; border:1px solid; font-family:'DM Mono',monospace; }
+  .fp-btn-primary { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+  .fp-btn-primary:hover { background:rgba(200,169,110,0.25); }
+  .fp-btn-ghost { background:transparent; border-color:rgba(255,255,255,0.15); color:rgba(255,255,255,0.5); }
+  .fp-btn-ghost:hover { border-color:rgba(255,255,255,0.3); color:#fff; }
+  .fp-footer { padding:16px 24px; border-top:1px solid rgba(255,255,255,0.08); display:flex; justify-content:flex-end; gap:10px; }
+
+  /* CHAPTER SIDEBAR */
+  #sidebar { width:220px; background:#232326; border-right:1px solid var(--chrome-border); display:none; flex-direction:column; flex-shrink:0; overflow-y:auto; }
+  #sidebar.open { display:flex; }
+  #sidebar-title { padding:14px 16px 10px; font-family:'Playfair Display',serif; font-size:12px; color:var(--accent); letter-spacing:0.15em; text-transform:uppercase; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .chapter-item { padding:8px 16px; font-size:12px; color:rgba(255,255,255,0.5); cursor:pointer; border-left:2px solid transparent; transition:all 0.15s; display:flex; justify-content:space-between; align-items:center; }
+  .chapter-item:hover { color:#fff; background:rgba(255,255,255,0.04); }
+  .chapter-item.active { border-left-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+  .chapter-item.h2 { padding-left:28px; font-size:11px; }
+  .chapter-item.h3 { padding-left:40px; font-size:10px; }
+  #add-chapter { margin:10px; padding:8px; background:rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.1); border-radius:4px; color:rgba(255,255,255,0.3); font-size:11px; cursor:pointer; text-align:center; transition:all 0.2s; }
+  #add-chapter:hover { border-color:var(--accent); color:var(--accent); }
+  #main-area { display:flex; flex:1; overflow:hidden; min-height:0; }
+
+  /* CHAOS OVERLAY */
+  #chaos-overlay { display:none; position:fixed; inset:0; z-index:999; pointer-events:none; }
+  #chaos-overlay.active { display:block; pointer-events:all; }
+  #chaos-canvas { position:absolute; inset:0; }
+  #chaos-exit { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); font-family:'Playfair Display',serif; font-size:12px; letter-spacing:0.3em; color:rgba(200,169,110,0.6); cursor:pointer; padding:10px 24px; border:1px solid rgba(200,169,110,0.3); background:rgba(10,10,15,0.85); transition:all 0.3s; }
+  #chaos-exit:hover { color:var(--accent); border-color:var(--accent); }
+  #chaos-label { position:absolute; top:24px; left:50%; transform:translateX(-50%); font-family:'Playfair Display',serif; font-size:28px; letter-spacing:0.5em; color:rgba(200,169,110,0.15); pointer-events:none; text-transform:uppercase; }
+
+  /* REFERENCE MODAL TABS */
+  .ref-tab { padding:6px 14px; font-size:11px; letter-spacing:0.08em; color:rgba(255,255,255,0.4); cursor:pointer; border-radius:4px 4px 0 0; border:1px solid transparent; border-bottom:none; transition:all 0.15s; }
+  .ref-tab:hover { color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.04); }
+  .ref-tab.active { color:var(--accent); background:rgba(200,169,110,0.08); border-color:rgba(200,169,110,0.2); }
+  #ref-body h3 { font-family:'Playfair Display',serif; font-size:15px; color:#fff; margin:20px 0 8px; }
+  #ref-body h4 { font-size:12px; letter-spacing:0.1em; color:var(--accent); text-transform:uppercase; margin:16px 0 6px; }
+  #ref-body p { margin-bottom:10px; }
+  #ref-body code { font-family:'DM Mono',monospace; font-size:11px; background:rgba(255,255,255,0.06); padding:2px 6px; border-radius:3px; color:#e8dcc8; }
+  #ref-body .example { background:rgba(255,255,255,0.04); border-left:3px solid var(--accent); padding:10px 14px; border-radius:0 4px 4px 0; margin:8px 0 14px; font-style:italic; font-size:12px; color:rgba(255,255,255,0.6); }
+  #ref-body ul { padding-left:18px; margin-bottom:10px; }
+  #ref-body li { margin-bottom:4px; }
+
+  /* EXPORT TOAST */
+  #toast { position:fixed; bottom:60px; right:24px; background:#2f2f33; border:1px solid rgba(200,169,110,0.4); color:var(--accent); padding:10px 18px; border-radius:6px; font-size:12px; font-family:'DM Mono',monospace; letter-spacing:0.1em; opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:500; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<div id="titlebar">
+  <span id="titlebar-name">AesiaLux</span>
+  <span id="titlebar-file">Untitled Document</span>
+  <span id="chaos-hint">✦ try "chaosLux"</span>
+</div>
+
+<div id="menubar">
+  <div class="menu-item">File
+    <div class="dropdown">
+      <div class="dropdown-item" onclick="newDoc()">New <span>Ctrl+N</span></div>
+      <div class="dropdown-sep"></div>
+      <div class="dropdown-label">Save As</div>
+      <div class="dropdown-item" onclick="saveTxt()">Plain Text (.txt) <span>Ctrl+S</span></div>
+      <div class="dropdown-item" onclick="saveHtml()">Web Page (.html) <span>Ctrl+Shift+S</span></div>
+      <div class="dropdown-item" onclick="saveDocx()">Word Document (.docx) <span>Ctrl+D</span></div>
+      <div class="dropdown-item" onclick="savePdf()">PDF Document (.pdf) <span>Ctrl+P</span></div>
+      <div class="dropdown-item" onclick="saveJson()">AesiaLux Archive (.json)</div>
+    </div>
+  </div>
+  <div class="menu-item">Edit
+    <div class="dropdown">
+      <div class="dropdown-item" onclick="document.execCommand('undo')">Undo <span>Ctrl+Z</span></div>
+      <div class="dropdown-item" onclick="document.execCommand('redo')">Redo <span>Ctrl+Y</span></div>
+      <div class="dropdown-sep"></div>
+      <div class="dropdown-item" onclick="document.execCommand('selectAll')">Select All <span>Ctrl+A</span></div>
+      <div class="dropdown-sep"></div>
+      <div class="dropdown-label">Chapter Tools</div>
+      <div class="dropdown-item" onclick="insertChapterBreak()">Chapter Break <span>Ctrl+Shift+C</span></div>
+      <div class="dropdown-item" onclick="insertPartBreak()">Part Break</div>
+      <div class="dropdown-item" onclick="renameLastChapter()">Rename Last Chapter…</div>
+    </div>
+  </div>
+  <div class="menu-item">Format
+    <div class="dropdown">
+      <div class="dropdown-item" onclick="fmt('bold')">Bold <span>Ctrl+B</span></div>
+      <div class="dropdown-item" onclick="fmt('italic')">Italic <span>Ctrl+I</span></div>
+      <div class="dropdown-item" onclick="fmt('underline')">Underline <span>Ctrl+U</span></div>
+      <div class="dropdown-item" onclick="fmt('strikeThrough')">Strikethrough</div>
+      <div class="dropdown-sep"></div>
+      <div class="dropdown-item" onclick="applyHeading(1)">Heading 1 <span>Ctrl+1</span></div>
+      <div class="dropdown-item" onclick="applyHeading(2)">Heading 2 <span>Ctrl+2</span></div>
+      <div class="dropdown-item" onclick="applyHeading(3)">Heading 3 <span>Ctrl+3</span></div>
+      <div class="dropdown-item" onclick="applyBlockquote()">Block Quote</div>
+    </div>
+  </div>
+  <div class="menu-item">Templates
+    <div class="dropdown">
+      <div class="dropdown-label">Document Types</div>
+      <div class="dropdown-item" onclick="openFormatModal('templates')">Browse Templates…</div>
+      <div class="dropdown-sep"></div>
+      <div class="dropdown-item" onclick="applyTemplate('essay')">Essay (General)</div>
+      <div class="dropdown-item" onclick="applyTemplate('novel')">Novel / Fiction</div>
+      <div class="dropdown-item" onclick="applyTemplate('chapter')">Multi-Chapter Book</div>
+      <div class="dropdown-sep"></div>
+      <div class="dropdown-label">Academic Formats</div>
+      <div class="dropdown-item" onclick="applyTemplate('mla')">MLA Essay</div>
+      <div class="dropdown-item" onclick="applyTemplate('apa')">APA Paper</div>
+      <div class="dropdown-item" onclick="applyTemplate('academic')">General Academic</div>
+      <div class="dropdown-sep"></div>
+      <div class="dropdown-item" onclick="applyTemplate('screenplay')">Screenplay</div>
+      <div class="dropdown-item" onclick="applyTemplate('journal')">Journal / Diary</div>
+    </div>
+  </div>
+  <div class="menu-item">View
+    <div class="dropdown">
+      <div class="dropdown-item" onclick="toggleSidebar()">Chapter Navigator <span>Ctrl+\\</span></div>
+      <div class="dropdown-sep"></div>
+      <div class="dropdown-item" onclick="openFormatModal('page')">Page Settings…</div>
+    </div>
+  </div>
+  <div class="menu-item">Insert
+    <div class="dropdown">
+      <div class="dropdown-item" onclick="insertHR()">Horizontal Rule</div>
+      <div class="dropdown-item" onclick="insertDate()">Today's Date</div>
+      <div class="dropdown-item" onclick="insertPageBreak()">Page Break</div>
+      <div class="dropdown-item" onclick="insertChapter()">New Chapter Heading</div>
+      <div class="dropdown-item" onclick="insertChapterBreak()">Chapter Break <span>Ctrl+Shift+C</span></div>
+    </div>
+  </div>
+  <div class="menu-item">References
+    <div class="dropdown" style="min-width:240px;">
+      <div class="dropdown-label">Citation Styles</div>
+      <div class="dropdown-item" onclick="openRefModal('mla')">MLA (Modern Language Assoc.)</div>
+      <div class="dropdown-item" onclick="openRefModal('apa')">APA (American Psych. Assoc.)</div>
+      <div class="dropdown-item" onclick="openRefModal('chicago')">Chicago / Turabian</div>
+      <div class="dropdown-item" onclick="openRefModal('harvard')">Harvard</div>
+      <div class="dropdown-item" onclick="openRefModal('ieee')">IEEE</div>
+      <div class="dropdown-item" onclick="openRefModal('ama')">AMA (Medical)</div>
+      <div class="dropdown-sep"></div>
+      <div class="dropdown-item" onclick="openRefModal('mla')">Browse All Formats…</div>
+    </div>
+  </div>
+
+<div id="toolbar">
+  <select id="font-family-select" onchange="applyFont(this.value)">
+    <option value="'EB Garamond', serif">EB Garamond</option>
+    <option value="'Playfair Display', serif">Playfair Display</option>
+    <option value="'DM Mono', monospace">DM Mono</option>
+    <option value="Georgia, serif">Georgia</option>
+    <option value="'Times New Roman', serif">Times New Roman</option>
+    <option value="Verdana, sans-serif">Verdana</option>
+    <option value="'Courier New', monospace">Courier New</option>
+  </select>
+  <select id="font-size-select" onchange="applySize(this.value)">
+    <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+    <option value="14" selected>14</option><option value="16">16</option><option value="18">18</option>
+    <option value="20">20</option><option value="24">24</option><option value="28">28</option>
+    <option value="32">32</option><option value="36">36</option><option value="48">48</option>
+    <option value="60">60</option><option value="72">72</option>
+  </select>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" id="btn-bold" title="Bold" onclick="fmt('bold')"><b>B</b></button>
+  <button class="tb-btn" id="btn-italic" title="Italic" onclick="fmt('italic')"><i>I</i></button>
+  <button class="tb-btn" id="btn-underline" title="Underline" onclick="fmt('underline')"><u>U</u></button>
+  <button class="tb-btn" id="btn-strike" title="Strike" onclick="fmt('strikeThrough')"><s>S</s></button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" title="H1" onclick="applyHeading(1)" style="font-size:11px;font-weight:700;">H1</button>
+  <button class="tb-btn" title="H2" onclick="applyHeading(2)" style="font-size:11px;font-weight:700;">H2</button>
+  <button class="tb-btn" title="H3" onclick="applyHeading(3)" style="font-size:11px;font-weight:700;">H3</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" title="Left" onclick="fmt('justifyLeft')">
+    <svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" fill="none" stroke-width="1.5"><line x1="1" y1="3" x2="13" y2="3"/><line x1="1" y1="7" x2="9" y2="7"/><line x1="1" y1="11" x2="13" y2="11"/></svg>
+  </button>
+  <button class="tb-btn" title="Center" onclick="fmt('justifyCenter')">
+    <svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" fill="none" stroke-width="1.5"><line x1="1" y1="3" x2="13" y2="3"/><line x1="3" y1="7" x2="11" y2="7"/><line x1="1" y1="11" x2="13" y2="11"/></svg>
+  </button>
+  <button class="tb-btn" title="Right" onclick="fmt('justifyRight')">
+    <svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" fill="none" stroke-width="1.5"><line x1="1" y1="3" x2="13" y2="3"/><line x1="5" y1="7" x2="13" y2="7"/><line x1="1" y1="11" x2="13" y2="11"/></svg>
+  </button>
+  <div class="tb-sep"></div>
+  <!-- Font color wheel -->
+  <div class="color-picker-wrap" title="Font Color">
+    <div class="color-swatch" id="font-color-swatch" style="background:#1a1a1a;">
+      <input type="color" id="font-color-input" value="#1a1a1a" oninput="onFontColorChange(this.value)" />
+    </div>
+    <label for="font-color-input">Font</label>
+  </div>
+  <!-- Highlight color wheel + apply button -->
+  <div class="color-picker-wrap" title="Highlight Color">
+    <div class="color-swatch highlight-swatch" id="highlight-color-swatch">
+      <input type="color" id="highlight-color-input" value="#fff176" oninput="onHighlightColorChange(this.value)" />
+    </div>
+    <label for="highlight-color-input">Mark</label>
+  </div>
+  <button class="tb-btn" title="Apply Highlight" onclick="applyHighlight()" style="font-size:13px;" id="btn-highlight">🖊</button>
+  <button class="tb-btn" title="Bullets" onclick="fmt('insertUnorderedList')" style="font-size:16px;">≡</button>
+  <button class="tb-btn" title="Numbers" onclick="fmt('insertOrderedList')" style="font-size:11px;">1≡</button>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" title="Templates" onclick="openFormatModal('templates')" style="font-size:10px;width:auto;padding:0 8px;letter-spacing:0.05em;">TEMPLATES</button>
+  <button class="tb-btn" title="Chapters" onclick="toggleSidebar()" style="font-size:10px;width:auto;padding:0 8px;letter-spacing:0.05em;">CHAPTERS</button>
+</div>
+
+<div id="main-area">
+  <div id="sidebar">
+    <div id="sidebar-title">Navigator</div>
+    <div id="chapter-list"></div>
+    <div id="add-chapter" onclick="insertChapter()">+ Add Chapter</div>
+  </div>
+  <div id="scroll-area">
+    <div id="page">
+      <div id="editor" contenteditable="true" spellcheck="true"></div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <span class="status-item" id="word-count">0 words</span>
+  <span class="status-item" id="char-count">0 chars</span>
+  <span class="status-item" id="format-indicator">—</span>
+  <span class="status-item" id="page-info">Page 1</span>
+</div>
+
+<!-- FORMAT MODAL -->
+<div id="format-modal">
+  <div id="format-panel">
+    <div class="fp-header">
+      <span class="fp-title">Format & Templates</span>
+      <button class="fp-close" onclick="closeFormatModal()">✕</button>
+    </div>
+    <div class="fp-tabs">
+      <div class="fp-tab active" onclick="switchTab('templates')">Templates</div>
+      <div class="fp-tab" onclick="switchTab('page')">Page Setup</div>
+      <div class="fp-tab" onclick="switchTab('novel')">Novel Tools</div>
+      <div class="fp-tab" onclick="switchTab('export')">Export</div>
+    </div>
+
+    <!-- TEMPLATES TAB -->
+    <div id="tab-templates" class="fp-content active">
+      <div class="template-grid">
+        <div class="template-card" onclick="applyTemplate('essay')">
+          <div class="tc-name">📝 Essay</div>
+          <div class="tc-desc">Academic or personal essay with introduction, body paragraphs, and conclusion structure.</div>
+          <div class="tc-preview">Introduction<br>Body Paragraph 1<br>Body Paragraph 2<br>Conclusion</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('novel')">
+          <div class="tc-name">📖 Novel / Fiction</div>
+          <div class="tc-desc">Single-narrative fiction with title page, dedication, and chapter structure.</div>
+          <div class="tc-preview">Title Page<br>Dedication<br>Chapter One<br>Chapter Two…</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('chapter')">
+          <div class="tc-name">📚 Multi-Chapter Book</div>
+          <div class="tc-desc">Non-fiction or structured book with parts, chapters, and section headings.</div>
+          <div class="tc-preview">Part I: Title<br>Chapter 1<br>  Section 1.1<br>  Section 1.2</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('academic')">
+          <div class="tc-name">🎓 Academic Paper</div>
+          <div class="tc-desc">General research paper with abstract, methodology, results, and references.</div>
+          <div class="tc-preview">Abstract<br>1. Introduction<br>2. Methodology<br>References</div>
+        </div>
+        <div class="template-card" style="grid-column:1/-1;background:rgba(200,169,110,0.04);border-color:rgba(200,169,110,0.15);">
+          <div class="tc-name" style="margin-bottom:10px;">📐 Academic Format Selector</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <select id="academic-format-select" style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.15);border-radius:4px;color:rgba(255,255,255,0.8);padding:6px 12px;font-size:12px;outline:none;flex:1;min-width:180px;">
+              <option value="mla">MLA — Modern Language Association</option>
+              <option value="apa">APA — American Psychological Association</option>
+              <option value="academic">General Academic / Research Paper</option>
+              <option value="chicago_notes">Chicago Notes-Bibliography</option>
+              <option value="chicago_author">Chicago Author-Date</option>
+              <option value="harvard">Harvard Referencing</option>
+              <option value="ieee">IEEE (Engineering & CS)</option>
+              <option value="ama">AMA (Medical / Health Sciences)</option>
+            </select>
+            <button class="fp-btn fp-btn-primary" onclick="applyAcademicFormat()">Apply Format</button>
+            <button class="fp-btn fp-btn-ghost" onclick="openRefModal(document.getElementById('academic-format-select').value)">View Guide</button>
+          </div>
+          <div class="tc-desc" style="margin-top:8px;" id="academic-format-desc">MLA is used in humanities — literature, language arts, philosophy. Uses author-page in-text citations and a Works Cited page.</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('screenplay')">
+          <div class="tc-name">🎬 Screenplay</div>
+          <div class="tc-desc">Script format with scene headings, action lines, and dialogue blocks.</div>
+          <div class="tc-preview">FADE IN:<br>INT. LOCATION - DAY<br>Action line.<br>CHARACTER<br>Dialogue.</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('journal')">
+          <div class="tc-name">✍️ Journal / Diary</div>
+          <div class="tc-desc">Personal writing with dated entries and reflective prompts.</div>
+          <div class="tc-preview">Date Entry<br>Today I…<br><br>Date Entry<br>Today I…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE SETUP TAB -->
+    <div id="tab-page" class="fp-content">
+      <div class="fp-section">
+        <div class="fp-section-title">Page Layout</div>
+        <div class="fp-row">
+          <span class="fp-label">Line Spacing</span>
+          <select class="fp-select" id="ps-linespacing" onchange="applyPageSetting()">
+            <option value="1.4">Single (1.4)</option>
+            <option value="1.8" selected>Standard (1.8)</option>
+            <option value="2">Double (2.0)</option>
+            <option value="2.5">Wide (2.5)</option>
+          </select>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">Page Width</span>
+          <select class="fp-select" id="ps-pagewidth" onchange="applyPageSetting()">
+            <option value="816">US Letter (816px)</option>
+            <option value="794">A4 (794px)</option>
+            <option value="700">Narrow</option>
+            <option value="960">Wide</option>
+          </select>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">Margins</span>
+          <select class="fp-select" id="ps-margins" onchange="applyPageSetting()">
+            <option value="96">Normal (1 inch)</option>
+            <option value="72">Moderate (0.75 in)</option>
+            <option value="48">Narrow (0.5 in)</option>
+            <option value="128">Wide (1.33 in)</option>
+          </select>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">Body Font</span>
+          <select class="fp-select" id="ps-bodyfont" onchange="applyPageSetting()">
+            <option value="'EB Garamond', serif">EB Garamond</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Times New Roman', serif">Times New Roman</option>
+            <option value="'Playfair Display', serif">Playfair Display</option>
+            <option value="Verdana, sans-serif">Verdana</option>
+            <option value="'Courier New', monospace">Courier New (Manuscript)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOVEL TOOLS TAB -->
+    <div id="tab-novel" class="fp-content">
+      <div class="fp-section">
+        <div class="fp-section-title">Book Info</div>
+        <div class="fp-row"><span class="fp-label">Title</span><input class="fp-input" id="book-title" placeholder="My Novel" /></div>
+        <div class="fp-row"><span class="fp-label">Author</span><input class="fp-input" id="book-author" placeholder="Your Name" /></div>
+        <div class="fp-row"><span class="fp-label">Subtitle</span><input class="fp-input" id="book-subtitle" placeholder="Optional subtitle" /></div>
+      </div>
+      <div class="fp-section">
+        <div class="fp-section-title">Quick Insert</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="fp-btn fp-btn-ghost" onclick="insertChapter();closeFormatModal()">+ Chapter Heading</button>
+          <button class="fp-btn fp-btn-ghost" onclick="insertSceneDivider()">― Scene Break</button>
+          <button class="fp-btn fp-btn-ghost" onclick="insertPartHeading()">+ Part Heading</button>
+          <button class="fp-btn fp-btn-ghost" onclick="insertPageBreak()">↵ Page Break</button>
+        </div>
+      </div>
+      <div class="fp-section">
+        <div class="fp-section-title">Chapter Counter</div>
+        <div class="fp-row">
+          <span class="fp-label">Chapters found</span>
+          <span id="chapter-count-display" style="color:var(--accent);font-size:14px;font-family:'DM Mono',monospace;">0</span>
+        </div>
+        <div class="fp-row">
+          <span class="fp-label">Word count</span>
+          <span id="modal-word-count" style="color:var(--accent);font-size:14px;font-family:'DM Mono',monospace;">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXPORT TAB -->
+    <div id="tab-export" class="fp-content">
+      <div class="fp-section">
+        <div class="fp-section-title">Export Formats</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="template-card" onclick="saveTxt();closeFormatModal()">
+            <div class="tc-name">📄 Plain Text</div>
+            <div class="tc-desc">Simple .txt file. No formatting. Best for plain writing or sharing raw content.</div>
+          </div>
+          <div class="template-card" onclick="saveHtml();closeFormatModal()">
+            <div class="tc-name">🌐 Web Page</div>
+            <div class="tc-desc">Styled .html file. Opens in any browser with full formatting preserved.</div>
+          </div>
+          <div class="template-card" onclick="saveDocx();closeFormatModal()">
+            <div class="tc-name">📝 Word (.docx)</div>
+            <div class="tc-desc">Microsoft Word document. Edit in Word, Google Docs, LibreOffice.</div>
+          </div>
+          <div class="template-card" onclick="savePdf();closeFormatModal()">
+            <div class="tc-name">🖨️ PDF</div>
+            <div class="tc-desc">Print-ready PDF. Preserves layout exactly. Best for sharing final drafts.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fp-footer">
+      <button class="fp-btn fp-btn-ghost" onclick="closeFormatModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- REFERENCE MODAL -->
+<div id="ref-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:300;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;">
+  <div style="background:#1e1e22;border:1px solid rgba(255,255,255,0.1);border-radius:10px;width:720px;max-width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.7);">
+    <!-- Header -->
+    <div style="padding:24px 28px 0;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;color:#fff;" id="ref-title">MLA Format Guide</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:0.1em;margin-top:4px;" id="ref-subtitle">Modern Language Association · 9th Edition</div>
+      </div>
+      <button onclick="closeRefModal()" style="background:none;border:none;color:rgba(255,255,255,0.3);font-size:22px;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <!-- Format tabs -->
+    <div style="display:flex;gap:2px;padding:16px 28px 0;flex-wrap:wrap;">
+      <div class="ref-tab active" onclick="openRefModal('mla')" data-fmt="mla">MLA</div>
+      <div class="ref-tab" onclick="openRefModal('apa')" data-fmt="apa">APA</div>
+      <div class="ref-tab" onclick="openRefModal('chicago_notes')" data-fmt="chicago_notes">Chicago NB</div>
+      <div class="ref-tab" onclick="openRefModal('chicago_author')" data-fmt="chicago_author">Chicago AD</div>
+      <div class="ref-tab" onclick="openRefModal('harvard')" data-fmt="harvard">Harvard</div>
+      <div class="ref-tab" onclick="openRefModal('ieee')" data-fmt="ieee">IEEE</div>
+      <div class="ref-tab" onclick="openRefModal('ama')" data-fmt="ama">AMA</div>
+      <div class="ref-tab" onclick="openRefModal('chicago_notes')" data-fmt="turabian">Turabian</div>
+    </div>
+    <!-- Content -->
+    <div id="ref-body" style="padding:24px 28px 32px;font-size:13px;line-height:1.7;color:rgba(255,255,255,0.75);max-height:65vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- CHAOS OVERLAY -->
+<div id="chaos-overlay">
+  <canvas id="chaos-canvas"></canvas>
+  <div id="chaos-label">chaosLux</div>
+  <div id="chaos-exit" onclick="exitChaos()">TAB TO RETURN</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const editor = document.getElementById('editor');
+let currentFormat = 'general';
+
+// ── FORMATTING ──
+function fmt(cmd) { document.execCommand(cmd, false, null); editor.focus(); updateToolbarState(); }
+
+function applyFont(font) { document.execCommand('fontName', false, font); editor.focus(); }
+
+function applySize(size) {
+  document.execCommand('fontSize', false, '7');
+  editor.querySelectorAll('font[size="7"]').forEach(s => { s.removeAttribute('size'); s.style.fontSize = size + 'pt'; });
+  editor.focus();
+}
+
+let currentFontColor = '#1a1a1a';
+let currentHighlightColor = '#fff176';
+
+function onFontColorChange(color) {
+  currentFontColor = color;
+  document.getElementById('font-color-swatch').style.background = color;
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed) {
+    document.execCommand('foreColor', false, color);
+    editor.focus();
+  }
+}
+
+function onHighlightColorChange(color) {
+  currentHighlightColor = color;
+  document.getElementById('highlight-color-swatch').style.boxShadow = `inset 0 0 0 30px ${color}bb`;
+}
+
+function applyColor(color) {
+  document.execCommand('foreColor', false, color);
+  editor.focus();
+}
+
+function applyHighlight() {
+  document.execCommand('hiliteColor', false, currentHighlightColor);
+  const btn = document.getElementById('btn-highlight');
+  btn.style.background = currentHighlightColor + '66';
+  btn.style.borderColor = currentHighlightColor;
+  setTimeout(() => { btn.style.background = ''; btn.style.borderColor = ''; }, 500);
+  editor.focus();
+}
+
+function applyHeading(level) {
+  document.execCommand('formatBlock', false, 'h' + level);
+  editor.focus();
+  updateChapterNav();
+}
+
+function applyBlockquote() { document.execCommand('formatBlock', false, 'blockquote'); editor.focus(); }
+
+function updateToolbarState() {
+  document.getElementById('btn-bold').classList.toggle('active', document.queryCommandState('bold'));
+  document.getElementById('btn-italic').classList.toggle('active', document.queryCommandState('italic'));
+  document.getElementById('btn-underline').classList.toggle('active', document.queryCommandState('underline'));
+  document.getElementById('btn-strike').classList.toggle('active', document.queryCommandState('strikeThrough'));
+}
+editor.addEventListener('keyup', updateToolbarState);
+editor.addEventListener('mouseup', updateToolbarState);
+
+// ── STATS ──
+function updateStats() {
+  const text = editor.innerText.trim();
+  const words = text === '' ? 0 : text.split(/\s+/).length;
+  document.getElementById('word-count').textContent = words.toLocaleString() + ' words';
+  document.getElementById('char-count').textContent = text.length.toLocaleString() + ' chars';
+  document.getElementById('modal-word-count').textContent = words.toLocaleString();
+  updateChapterNav();
+}
+editor.addEventListener('input', updateStats);
+
+// ── PAGE SETTINGS ──
+function applyPageSetting() {
+  const ls = document.getElementById('ps-linespacing').value;
+  const pw = document.getElementById('ps-pagewidth').value;
+  const mg = document.getElementById('ps-margins').value;
+  const bf = document.getElementById('ps-bodyfont').value;
+  editor.style.lineHeight = ls;
+  editor.style.fontFamily = bf;
+  editor.style.padding = mg + 'px';
+  document.getElementById('page').style.width = pw + 'px';
+  document.getElementById('font-family-select').value = bf;
+}
+
+// ── INSERT HELPERS ──
+function insertHR() { document.execCommand('insertHTML', false, '<hr>'); editor.focus(); }
+function insertDate() { document.execCommand('insertText', false, new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})); editor.focus(); }
+function insertPageBreak() { document.execCommand('insertHTML', false, '<div style="page-break-after:always;border-top:2px dashed #ddd;margin:30px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Page Break —</div>'); editor.focus(); }
+
+function insertChapter() {
+  const num = editor.querySelectorAll('h1').length + 1;
+  document.execCommand('insertHTML', false, `<h1>Chapter ${num}</h1><p><br></p>`);
+  editor.focus();
+  updateChapterNav();
+}
+
+function insertPartHeading() {
+  document.execCommand('insertHTML', false, `<h1 style="text-align:center;letter-spacing:0.2em;text-transform:uppercase;">PART ONE</h1><p><br></p>`);
+  editor.focus();
+}
+
+function insertSceneDivider() {
+  document.execCommand('insertHTML', false, `<p style="text-align:center;color:#999;letter-spacing:0.3em;">✦ &nbsp; ✦ &nbsp; ✦</p>`);
+  editor.focus();
+}
+
+// ── TEMPLATES ──
+const templates = {
+  essay: {
+    name: 'Essay',
+    html: `<h1>Essay Title</h1>
+<p><em>Your Name · Date</em></p>
+<p><br></p>
+<h2>Introduction</h2>
+<p>Begin with a hook that draws the reader in. State your thesis clearly at the end of this paragraph.</p>
+<p><br></p>
+<h2>Body Paragraph 1</h2>
+<p>Topic sentence. Supporting evidence and analysis. Transition to next point.</p>
+<p><br></p>
+<h2>Body Paragraph 2</h2>
+<p>Topic sentence. Supporting evidence and analysis. Transition to next point.</p>
+<p><br></p>
+<h2>Body Paragraph 3</h2>
+<p>Topic sentence. Supporting evidence and analysis. Transition to conclusion.</p>
+<p><br></p>
+<h2>Conclusion</h2>
+<p>Restate thesis in new words. Summarize key points. End with a broader reflection or call to action.</p>`
+  },
+  novel: {
+    name: 'Novel',
+    html: `<p style="text-align:center;margin-top:120px;"><br></p>
+<h1 style="text-align:center;letter-spacing:0.05em;">Novel Title</h1>
+<p style="text-align:center;font-style:italic;color:#666;">A Novel</p>
+<p style="text-align:center;margin-top:20px;">by Author Name</p>
+<div style="page-break-after:always;border-top:2px dashed #ddd;margin:40px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Page Break —</div>
+<p style="text-align:center;margin-top:60px;font-style:italic;color:#555;">For someone.</p>
+<div style="page-break-after:always;border-top:2px dashed #ddd;margin:40px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Page Break —</div>
+<h1>Chapter One</h1>
+<p>The story begins here. Set your scene, introduce your protagonist, and give the reader a reason to turn the page.</p>
+<p><br></p>
+<p>Continue the opening chapter…</p>
+<p><br></p>
+<h1>Chapter Two</h1>
+<p>The story continues…</p>`
+  },
+  chapter: {
+    name: 'Multi-Chapter Book',
+    html: `<h1 style="text-align:center;margin-top:80px;">Book Title</h1>
+<p style="text-align:center;color:#666;">Subtitle or Tagline</p>
+<p style="text-align:center;margin-top:16px;font-style:italic;">by Author Name</p>
+<div style="page-break-after:always;border-top:2px dashed #ddd;margin:40px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Page Break —</div>
+<h1 style="text-align:center;text-transform:uppercase;letter-spacing:0.25em;">PART ONE</h1>
+<h2 style="text-align:center;font-style:italic;">The Beginning of Something</h2>
+<div style="page-break-after:always;border-top:2px dashed #ddd;margin:30px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Page Break —</div>
+<h1>Chapter 1: Opening</h1>
+<h3>Section 1.1</h3>
+<p>Content for section 1.1 goes here.</p>
+<p><br></p>
+<h3>Section 1.2</h3>
+<p>Content for section 1.2 goes here.</p>
+<p><br></p>
+<p><em>Use Edit → Chapter Break to add the next chapter with auto-numbering.</em></p>`
+  },
+  academic: {
+    name: 'Academic Paper',
+    html: `<h1 style="text-align:center;">Paper Title: A Subtitle That Explains the Study</h1>
+<p style="text-align:center;color:#666;font-style:italic;">Author Name · Institution · Date</p>
+<p><br></p>
+<h2>Abstract</h2>
+<p>A concise summary of the paper (150–250 words). State the research question, methodology, key findings, and significance.</p>
+<p><br></p>
+<h2>1. Introduction</h2>
+<p>Introduce the topic and context. State the problem being investigated. Present the thesis or research question. Outline the structure of the paper.</p>
+<p><br></p>
+<h2>2. Literature Review</h2>
+<p>Survey relevant prior research. Identify gaps this paper addresses.</p>
+<p><br></p>
+<h2>3. Methodology</h2>
+<p>Describe your research approach, data sources, and analytical methods.</p>
+<p><br></p>
+<h2>4. Results</h2>
+<p>Present your findings clearly. Use data, examples, or evidence.</p>
+<p><br></p>
+<h2>5. Discussion</h2>
+<p>Interpret results. Discuss implications, limitations, and future directions.</p>
+<p><br></p>
+<h2>6. Conclusion</h2>
+<p>Summarize key contributions. Restate significance.</p>
+<p><br></p>
+<h2>References</h2>
+<p>Author, A. (Year). Title of work. Publisher.</p>
+<p>Author, B. (Year). Article title. <em>Journal Name, Volume</em>(Issue), pages.</p>`
+  },
+  mla: {
+    name: 'MLA Essay',
+    html: `<p>First Last</p>
+<p>Professor Name</p>
+<p>Course Name</p>
+<p>${new Date().toLocaleDateString('en-US',{day:'numeric',month:'long',year:'numeric'})}</p>
+<h1 style="text-align:center;font-size:1.1em;font-weight:normal;">Essay Title Centered Here</h1>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;Begin your essay with an indented first paragraph. MLA format uses double-spacing, Times New Roman 12pt, and 1-inch margins. The first line of each paragraph is indented half an inch.</p>
+<p><br></p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;Subsequent paragraphs continue here. In-text citations use the author's last name and page number in parentheses (Smith 42). No comma between name and page number.</p>
+<p><br></p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;Continue your argument, analysis, or narrative. Each paragraph should have a clear topic sentence, supporting evidence, and a transition.</p>
+<p><br></p>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;Conclusion paragraph restates your thesis and synthesizes your argument without simply repeating it.</p>
+<p><br></p>
+<h2 style="text-align:center;font-size:1em;font-weight:normal;">Works Cited</h2>
+<p>Last, First. <em>Title of Book</em>. Publisher, Year.</p>
+<p>Last, First. "Article Title." <em>Journal Name</em>, vol. 1, no. 1, Year, pp. 1–10.</p>
+<p>Last, First. "Webpage Title." <em>Website Name</em>, Day Month Year, URL.</p>`
+  },
+  apa: {
+    name: 'APA Essay',
+    html: `<p style="text-align:center;margin-top:100px;"><br></p>
+<h1 style="text-align:center;">Paper Title</h1>
+<p style="text-align:center;">Author Name</p>
+<p style="text-align:center;">Department, Institution</p>
+<p style="text-align:center;">Course: COURSE 101</p>
+<p style="text-align:center;">Instructor: Professor Name</p>
+<p style="text-align:center;">${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</p>
+<div style="page-break-after:always;border-top:2px dashed #ddd;margin:30px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Page Break —</div>
+<h2 style="text-align:center;">Abstract</h2>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;The abstract is a single paragraph of 150–250 words summarizing the study's purpose, method, results, and conclusions. Do not indent the first line of the abstract.</p>
+<p><em>Keywords:</em> keyword one, keyword two, keyword three</p>
+<div style="page-break-after:always;border-top:2px dashed #ddd;margin:30px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Page Break —</div>
+<h1 style="text-align:center;">Paper Title</h1>
+<p>&nbsp;&nbsp;&nbsp;&nbsp;APA 7th edition uses double-spacing, Times New Roman or similar 12pt font, and 1-inch margins. Paragraphs are indented 0.5 inches. In-text citations include author and year: (Smith, 2022) or (Smith, 2022, p. 42) for direct quotes.</p>
+<p><br></p>
+<h2>Method</h2>
+<h3>Participants</h3>
+<p>Describe your sample here.</p>
+<h3>Materials</h3>
+<p>Describe instruments or stimuli used.</p>
+<h3>Procedure</h3>
+<p>Describe what participants did, step by step.</p>
+<h2>Results</h2>
+<p>Report your findings with statistics as appropriate.</p>
+<h2>Discussion</h2>
+<p>Interpret your results. Discuss limitations and future directions.</p>
+<h2>References</h2>
+<p>Last, F. M. (Year). <em>Title of book</em>. Publisher. https://doi.org/xxxxx</p>
+<p>Last, F. M., &amp; Last, F. M. (Year). Article title. <em>Journal Name, Volume</em>(Issue), Page–Page. https://doi.org/xxxxx</p>`
+  },
+  screenplay: {
+    name: 'Screenplay',
+    html: `<p style="text-align:center;margin-top:80px;font-size:18pt;font-weight:bold;">SCREENPLAY TITLE</p>
+<p style="text-align:center;color:#666;">Written by</p>
+<p style="text-align:center;">Author Name</p>
+<div style="page-break-after:always;border-top:2px dashed #ddd;margin:40px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Page Break —</div>
+<p style="font-family:'Courier New',monospace;">FADE IN:</p>
+<p><br></p>
+<p style="font-family:'Courier New',monospace;"><strong>INT. LOCATION — DAY</strong></p>
+<p style="font-family:'Courier New',monospace;">Description of the scene. What we see. The atmosphere.</p>
+<p><br></p>
+<p style="font-family:'Courier New',monospace;margin-left:180px;"><strong>CHARACTER NAME</strong></p>
+<p style="font-family:'Courier New',monospace;margin-left:120px;margin-right:120px;">Dialogue goes here. Keep it natural and in character.</p>
+<p><br></p>
+<p style="font-family:'Courier New',monospace;"><strong>EXT. ANOTHER LOCATION — NIGHT</strong></p>
+<p style="font-family:'Courier New',monospace;">More action description.</p>
+<p><br></p>
+<p style="font-family:'Courier New',monospace;margin-right:60px;text-align:right;">FADE OUT.</p>`
+  },
+  journal: {
+    name: 'Journal',
+    html: `<h1 style="text-align:center;">My Journal</h1>
+<p style="text-align:center;font-style:italic;color:#888;">Personal Writing · ${new Date().getFullYear()}</p>
+<p><br></p>
+<hr>
+<p><br></p>
+<h2>${new Date().toLocaleDateString('en-US', {weekday:'long', year:'numeric', month:'long', day:'numeric'})}</h2>
+<p>Today I…</p>
+<p><br></p>
+<p>I've been thinking about…</p>
+<p><br></p>
+<p>One thing I'm grateful for today:</p>
+<p><br></p>
+<hr>
+<p><br></p>
+<h2>Entry Title</h2>
+<p>Write your next entry here…</p>`
+  }
+};
+
+function applyTemplate(type) {
+  if (editor.innerText.trim() && !confirm(`Apply the ${templates[type].name} template? Current content will be replaced.`)) return;
+  editor.innerHTML = templates[type].html;
+  currentFormat = type;
+  document.getElementById('format-indicator').textContent = templates[type].name;
+  updateStats();
+  closeFormatModal();
+  showToast(templates[type].name + ' template applied');
+  editor.focus();
+}
+
+// ── CHAPTER NAVIGATOR ──
+let sidebarOpen = false;
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
+  updateChapterNav();
+}
+
+function updateChapterNav() {
+  const headings = editor.querySelectorAll('h1, h2, h3');
+  const list = document.getElementById('chapter-list');
+  list.innerHTML = '';
+  let count = 0;
+  headings.forEach((h, i) => {
+    const level = h.tagName.toLowerCase();
+    const item = document.createElement('div');
+    item.className = 'chapter-item ' + (level === 'h2' ? 'h2' : level === 'h3' ? 'h3' : '');
+    item.textContent = h.innerText.slice(0, 35) || '(untitled)';
+    item.onclick = () => h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    list.appendChild(item);
+    if (level === 'h1') count++;
+  });
+  document.getElementById('chapter-count-display').textContent = count;
+}
+
+// ── FORMAT MODAL ──
+function openFormatModal(tab) {
+  document.getElementById('format-modal').classList.add('open');
+  switchTab(tab || 'templates');
+  updateStats();
+}
+function closeFormatModal() { document.getElementById('format-modal').classList.remove('open'); }
+function switchTab(name) {
+  document.querySelectorAll('.fp-tab').forEach((t,i) => {
+    const tabs = ['templates','page','novel','export'];
+    t.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.fp-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── SAVE FUNCTIONS ──
+function getFilename() {
+  const first = editor.innerText.trim().split('\n')[0].slice(0, 40) || 'Untitled';
+  document.getElementById('titlebar-file').textContent = first;
+  return first.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+}
+
+function dl(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function saveTxt() {
+  dl(new Blob([editor.innerText], {type:'text/plain'}), getFilename() + '.txt');
+  showToast('Saved as .txt');
+}
+
+function saveHtml() {
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=EB+Garamond:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  body { max-width:816px; margin:80px auto; padding:0 96px; font-family:'EB Garamond',serif; font-size:14pt; line-height:1.8; color:#1a1a1a; }
+  h1 { font-family:'Playfair Display',serif; font-size:2.2em; margin:0.8em 0 0.3em; }
+  h2 { font-family:'Playfair Display',serif; font-size:1.6em; margin:1em 0 0.3em; border-bottom:1px solid #eee; padding-bottom:4px; }
+  h3 { font-family:'Playfair Display',serif; font-size:1.2em; margin:0.8em 0 0.2em; }
+  blockquote { border-left:3px solid #c8a96e; padding-left:20px; color:#555; font-style:italic; }
+</style>
+</head><body>${editor.innerHTML}</body></html>`;
+  dl(new Blob([html], {type:'text/html'}), getFilename() + '.html');
+  showToast('Saved as .html');
+}
+
+function saveJson() {
+  const data = JSON.stringify({html: editor.innerHTML, text: editor.innerText, format: currentFormat, saved: new Date().toISOString()}, null, 2);
+  dl(new Blob([data], {type:'application/json'}), getFilename() + '_aesialux.json');
+  showToast('Saved archive');
+}
+
+// .docx export via html-docx-js (CDN)
+function saveDocx() {
+  showToast('Generating .docx…');
+  // Check if already loaded
+  if (window.htmlDocx) { _doDocxSave(); return; }
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html-docx-js/0.3.1/html-docx.js';
+  script.onload = _doDocxSave;
+  script.onerror = () => {
+    // Offline fallback — Word-compatible HTML saved as .doc
+    // On Mac: opens in Word or Pages from Downloads folder
+    const content = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Georgia,serif;font-size:12pt;line-height:1.8;">${editor.innerHTML}</body></html>`;
+    dl(new Blob([content], {type:'application/msword'}), getFilename() + '.doc');
+    showToast('Saved as .doc — open in Word or Pages ✓');
+  };
+  document.head.appendChild(script);
+}
+
+function _doDocxSave() {
+  try {
+    const content = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Georgia,serif;font-size:12pt;line-height:1.8;">${editor.innerHTML}</body></html>`;
+    const blob = window.htmlDocx.asBlob(content);
+    // saveAs triggers the browser's native Save dialog
+    // On Mac: file lands in ~/Downloads — open with Word, Pages, or Google Docs
+    saveAs(blob, getFilename() + '.docx');
+    showToast('Saved .docx → check Downloads ✓');
+  } catch(e) {
+    const content = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Georgia,serif;font-size:12pt;line-height:1.8;">${editor.innerHTML}</body></html>`;
+    dl(new Blob([content], {type:'application/msword'}), getFilename() + '.doc');
+    showToast('Saved .doc → check Downloads ✓');
+  }
+}
+
+// PDF export via print dialog (best quality, no external lib needed)
+function savePdf() {
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=EB+Garamond:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+  @page { margin: 1in; size: letter; }
+  * { box-sizing: border-box; }
+  body { font-family:'EB Garamond',serif; font-size:12pt; line-height:1.8; color:#000; max-width:100%; }
+  h1 { font-family:'Playfair Display',serif; font-size:22pt; font-weight:700; margin:18pt 0 8pt; page-break-after:avoid; }
+  h2 { font-family:'Playfair Display',serif; font-size:16pt; font-weight:400; margin:14pt 0 6pt; border-bottom:0.5pt solid #999; padding-bottom:3pt; page-break-after:avoid; }
+  h3 { font-family:'Playfair Display',serif; font-size:13pt; font-weight:700; margin:10pt 0 4pt; page-break-after:avoid; }
+  blockquote { border-left:2pt solid #c8a96e; padding-left:12pt; color:#444; font-style:italic; margin:10pt 0; }
+  p { margin:0 0 8pt; orphans:3; widows:3; }
+  hr { border:none; border-top:0.5pt solid #ccc; margin:16pt 0; }
+</style>
+</head><body>${editor.innerHTML}<script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script></body></html>`);
+  printWindow.document.close();
+  showToast('PDF dialog opened — choose "Save as PDF"');
+}
+
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── KEYBOARD SHORTCUTS ──
+document.addEventListener('keydown', e => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key === 's' && !e.shiftKey) { e.preventDefault(); saveTxt(); }
+  if (mod && e.key === 'S') { e.preventDefault(); saveHtml(); }
+  if (mod && e.key === 'd') { e.preventDefault(); saveDocx(); }
+  if (mod && e.key === 'p') { e.preventDefault(); savePdf(); }
+  if (mod && e.key === 'n') { e.preventDefault(); newDoc(); }
+  if (mod && e.shiftKey && e.key === 'C') { e.preventDefault(); insertChapterBreak(); }
+  if (mod && e.key === '\\') { e.preventDefault(); toggleSidebar(); }
+  if (mod && e.key === '1') { e.preventDefault(); applyHeading(1); }
+  if (mod && e.key === '2') { e.preventDefault(); applyHeading(2); }
+  if (mod && e.key === '3') { e.preventDefault(); applyHeading(3); }
+  if (e.key === 'Tab' && chaosActive) { e.preventDefault(); exitChaos(); }
+  if (e.key === 'Tab' && !chaosActive) { e.preventDefault(); }
+  if (e.key === 'Escape') closeFormatModal();
+});
+
+function newDoc() {
+  if (editor.innerText.trim() && !confirm('Start new document? Unsaved changes will be lost.')) return;
+  editor.innerHTML = '';
+  currentFormat = 'general';
+  document.getElementById('format-indicator').textContent = '—';
+  updateStats();
+}
+
+// ── CHAPTER BREAK (smart auto-numbered) ──
+function insertChapterBreak() {
+  // Count existing h1s that look like chapters (not part headings)
+  const h1s = Array.from(editor.querySelectorAll('h1'));
+  const chapterH1s = h1s.filter(h => !h.style.textTransform || h.style.textTransform !== 'uppercase');
+  const nextNum = chapterH1s.length + 1;
+  const html = `
+<div style="page-break-after:always;border-top:2px dashed #ddd;margin:40px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Chapter Break —</div>
+<h1>Chapter ${nextNum}</h1>
+<h3>Section ${nextNum}.1</h3>
+<p>Begin writing Chapter ${nextNum} here.</p>
+<p><br></p>
+<h3>Section ${nextNum}.2</h3>
+<p>Continue the chapter…</p>
+<p><br></p>`;
+  document.execCommand('insertHTML', false, html);
+  // Scroll to new chapter
+  setTimeout(() => {
+    const newH1s = editor.querySelectorAll('h1');
+    const last = newH1s[newH1s.length - 1];
+    if (last) last.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+  editor.focus();
+  updateChapterNav();
+  showToast(`Chapter ${nextNum} added`);
+}
+
+function insertPartBreak() {
+  const parts = editor.querySelectorAll('h1[style*="uppercase"]').length;
+  const nextPart = parts + 1;
+  const romans = ['ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'];
+  const label = romans[nextPart - 1] || nextPart;
+  const html = `
+<div style="page-break-after:always;border-top:2px dashed #ddd;margin:40px 0;text-align:center;color:#ccc;font-size:11px;padding-top:8px;">— Part Break —</div>
+<h1 style="text-align:center;text-transform:uppercase;letter-spacing:0.25em;">PART ${label}</h1>
+<h2 style="text-align:center;font-style:italic;">Part Subtitle</h2>
+<p><br></p>`;
+  document.execCommand('insertHTML', false, html);
+  editor.focus();
+  updateChapterNav();
+}
+
+function renameLastChapter() {
+  const h1s = editor.querySelectorAll('h1');
+  if (!h1s.length) { showToast('No chapters found'); return; }
+  const last = h1s[h1s.length - 1];
+  const newName = prompt('Rename chapter:', last.innerText);
+  if (newName !== null) { last.innerText = newName; updateChapterNav(); }
+}
+
+// ── ACADEMIC FORMAT SELECTOR ──
+const academicFormatDescs = {
+  mla: 'MLA is used in humanities — literature, language arts, philosophy. Uses author-page in-text citations and a Works Cited page.',
+  apa: 'APA is used in social sciences, psychology, education. Uses author-year in-text citations and a References page.',
+  academic: 'General academic format — suitable for most research papers without a specific style requirement.',
+  chicago_notes: 'Chicago Notes-Bibliography is used in history, arts, humanities. Uses footnotes/endnotes and a Bibliography.',
+  chicago_author: 'Chicago Author-Date is used in social sciences. Uses author-year in-text citations and a References list.',
+  harvard: 'Harvard is widely used in UK universities across many disciplines. Uses author-year in-text and a References list.',
+  ieee: 'IEEE is used in engineering, CS, and technical fields. Uses numbered citations [1] in order of appearance.',
+  ama: 'AMA is used in medicine, health sciences, and biology. Uses superscript numbered citations and a References list.'
+};
+
+const academicTemplateMap = {
+  mla: 'mla', apa: 'apa', academic: 'academic',
+  chicago_notes: 'academic', chicago_author: 'academic',
+  harvard: 'academic', ieee: 'academic', ama: 'academic'
+};
+
+document.getElementById('academic-format-select')?.addEventListener('change', function() {
+  document.getElementById('academic-format-desc').textContent = academicFormatDescs[this.value] || '';
+});
+
+function applyAcademicFormat() {
+  const sel = document.getElementById('academic-format-select').value;
+  const tpl = academicTemplateMap[sel] || 'academic';
+  applyTemplate(tpl);
+}
+
+// ── REFERENCE MODAL ──
+const refContent = {
+  mla: {
+    title: 'MLA Format Guide',
+    subtitle: 'Modern Language Association · 9th Edition · Humanities',
+    body: `
+<h3>Overview</h3>
+<p>MLA is the standard format for papers in <strong>literature, language arts, philosophy, and humanities</strong>. It emphasizes the author and the specific page of a source.</p>
+
+<h4>Page Setup</h4>
+<ul>
+  <li>12pt Times New Roman (or similar serif font)</li>
+  <li>Double-spaced throughout — no extra space between paragraphs</li>
+  <li>1-inch margins on all sides</li>
+  <li>Header: Last name + page number, top right</li>
+  <li>First paragraph indented 0.5 inches</li>
+</ul>
+
+<h4>Header Block (Top Left, First Page)</h4>
+<div class="example">Your Full Name<br>Professor Name<br>Course Name and Number<br>Day Month Year</div>
+
+<h4>Title</h4>
+<p>Centered, standard capitalization, no bold or italics. No separate title page unless requested.</p>
+
+<h4>In-Text Citations</h4>
+<p>Author's last name and page number in parentheses — no comma between them.</p>
+<div class="example">"The sky was red" (Smith 42).<br>According to Smith, the sky turned red (42).<br>For two authors: (Smith and Jones 14).<br>For no author, use shortened title: ("Article Title" 5).</div>
+
+<h4>Works Cited Page</h4>
+<p>Title "Works Cited" centered. Entries alphabetized by author's last name. Hanging indent (first line flush, subsequent lines indented 0.5").</p>
+<div class="example"><strong>Book:</strong> Last, First. <em>Title of Book</em>. Publisher, Year.<br><br><strong>Article:</strong> Last, First. "Article Title." <em>Journal</em>, vol. 1, no. 2, Year, pp. 10–20.<br><br><strong>Website:</strong> Last, First. "Page Title." <em>Site Name</em>, Day Mon. Year, URL.<br><br><strong>No author:</strong> "Article Title." <em>Site Name</em>, Year, URL.</div>
+
+<h4>Quick Rules</h4>
+<ul>
+  <li>Italicize titles of long works (books, journals, films)</li>
+  <li>Put titles of short works in "quotation marks" (articles, poems, chapters)</li>
+  <li>Use "et al." after first author when 3 or more authors</li>
+  <li>DOI preferred over URL for journal articles</li>
+</ul>`
+  },
+  apa: {
+    title: 'APA Format Guide',
+    subtitle: 'American Psychological Association · 7th Edition · Social Sciences',
+    body: `
+<h3>Overview</h3>
+<p>APA is standard in <strong>psychology, education, social sciences, nursing, and business</strong>. It emphasizes recency — the year of publication is prominent in every citation.</p>
+
+<h4>Page Setup</h4>
+<ul>
+  <li>12pt Times New Roman, Calibri 11pt, or Arial 11pt</li>
+  <li>Double-spaced throughout, including references</li>
+  <li>1-inch margins on all sides</li>
+  <li>Running head (paper title, shortened to 50 chars) top left; page number top right</li>
+  <li>Paragraphs indented 0.5 inches</li>
+</ul>
+
+<h4>Title Page</h4>
+<div class="example">Paper Title (bold, centered, upper half of page)<br>Author Name(s)<br>Department, University<br>Course Number and Name<br>Instructor Name<br>Date</div>
+
+<h4>In-Text Citations</h4>
+<div class="example">One author: (Smith, 2022)<br>Two authors: (Smith &amp; Jones, 2022)<br>Three or more: (Smith et al., 2022)<br>Direct quote: (Smith, 2022, p. 42)<br>Narrative: Smith (2022) found that…</div>
+
+<h4>References Page</h4>
+<p>Title "References" bold and centered. Hanging indent. Alphabetical by last name.</p>
+<div class="example"><strong>Journal article:</strong><br>Last, F. M., &amp; Last, F. M. (Year). Title of article. <em>Journal Name, Volume</em>(Issue), Page–Page. https://doi.org/xxxxx<br><br><strong>Book:</strong><br>Last, F. M. (Year). <em>Title of book</em>. Publisher.<br><br><strong>Webpage:</strong><br>Last, F. M. (Year, Month Day). Title of page. Site Name. URL<br><br><strong>No author:</strong><br>Title of article. (Year). <em>Journal, Volume</em>(Issue), Page–Page.</div>
+
+<h4>Quick Rules</h4>
+<ul>
+  <li>Only capitalize the first word of article/chapter titles (and proper nouns)</li>
+  <li>Italicize journal names and volume numbers</li>
+  <li>Include DOI as hyperlink when available</li>
+  <li>List up to 20 authors; use ellipsis for more (Last author listed after …)</li>
+</ul>`
+  },
+  chicago_notes: {
+    title: 'Chicago Notes-Bibliography',
+    subtitle: 'Chicago Manual of Style · 17th Edition · History & Humanities',
+    body: `
+<h3>Overview</h3>
+<p>The Notes-Bibliography (NB) system is preferred in <strong>history, literature, arts, and some social sciences</strong>. Sources are cited in footnotes or endnotes plus a separate Bibliography.</p>
+
+<h4>Page Setup</h4>
+<ul>
+  <li>12pt Times New Roman, double-spaced body text</li>
+  <li>1-inch margins; first line of paragraphs indented 0.5"</li>
+  <li>Page numbers top right or bottom center</li>
+  <li>Footnotes single-spaced, 10pt, separated from body by short line</li>
+</ul>
+
+<h4>Footnotes / Endnotes</h4>
+<p>Insert a superscript number in the text at the end of the sentence containing the source. The note appears at the page bottom (footnote) or chapter end (endnote).</p>
+<div class="example">In text: The war ended in a stalemate.<sup>1</sup><br><br>Note: <sup>1</sup> John Smith, <em>The Great War</em> (New York: Publisher, 2020), 142.<br><br>Subsequent citation of same source: <sup>2</sup> Smith, <em>Great War</em>, 150.</div>
+
+<h4>Bibliography</h4>
+<p>Alphabetical by author last name. Hanging indent. Titled "Bibliography."</p>
+<div class="example"><strong>Book:</strong> Last, First. <em>Title of Book</em>. City: Publisher, Year.<br><br><strong>Article:</strong> Last, First. "Article Title." <em>Journal Name</em> Volume, no. Issue (Year): Page–Page.<br><br><strong>Website:</strong> Last, First. "Page Title." Site Name. Month Day, Year. URL.</div>`
+  },
+  chicago_author: {
+    title: 'Chicago Author-Date',
+    subtitle: 'Chicago Manual of Style · 17th Edition · Social Sciences',
+    body: `
+<h3>Overview</h3>
+<p>The Author-Date system is used in <strong>social sciences, physical sciences, and some humanities</strong>. It works like APA but follows Chicago rules.</p>
+
+<h4>In-Text Citations</h4>
+<div class="example">(Smith 2020)<br>(Smith 2020, 142) — with page number<br>(Smith and Jones 2020)<br>(Smith et al. 2020) — three or more authors</div>
+
+<h4>References Page</h4>
+<div class="example"><strong>Book:</strong> Last, First. Year. <em>Title of Book</em>. City: Publisher.<br><br><strong>Article:</strong> Last, First. Year. "Article Title." <em>Journal</em> Volume (Issue): Page–Page. https://doi.org/xxxxx<br><br><strong>Website:</strong> Last, First. Year. "Page Title." Site Name. Accessed Month Day. URL.</div>
+
+<h4>Key Differences from APA</h4>
+<ul>
+  <li>No comma between author and year in citation: (Smith 2020) not (Smith, 2020)</li>
+  <li>Capitalize all major words in journal titles</li>
+  <li>City of publication included for books</li>
+  <li>References page called "References" not "References"</li>
+</ul>`
+  },
+  harvard: {
+    title: 'Harvard Referencing',
+    subtitle: 'Author-Date System · Common in UK Universities',
+    body: `
+<h3>Overview</h3>
+<p>Harvard is widely used across UK and Australian universities in <strong>social sciences, business, law, and humanities</strong>. Like APA, it uses author-year citations.</p>
+
+<h4>In-Text Citations</h4>
+<div class="example">One author: (Smith 2022)<br>Two authors: (Smith and Jones 2022)<br>Three or more: (Smith et al. 2022)<br>Direct quote: (Smith 2022, p. 42)<br>Narrative: Smith (2022) argues that…</div>
+
+<h4>Reference List</h4>
+<p>Titled "References" or "Reference List." Alphabetical by author. Hanging indent.</p>
+<div class="example"><strong>Book:</strong> Last, F. (Year) <em>Title of Book</em>. City: Publisher.<br><br><strong>Chapter in edited book:</strong> Last, F. (Year) 'Chapter title', in Editor, F. (ed.) <em>Book Title</em>. City: Publisher, pp. 10–20.<br><br><strong>Journal article:</strong> Last, F. (Year) 'Article title', <em>Journal Name</em>, Volume(Issue), pp. 10–20.<br><br><strong>Website:</strong> Last, F. (Year) Title of page [Online]. Available at: URL (Accessed: Day Month Year).</div>
+
+<h4>Key Notes</h4>
+<ul>
+  <li>Note the format varies slightly between institutions — always check your university's specific guide</li>
+  <li>Article and chapter titles use single quotation marks</li>
+  <li>"et al." used for 3 or more authors in citations</li>
+</ul>`
+  },
+  ieee: {
+    title: 'IEEE Citation Style',
+    subtitle: 'Institute of Electrical and Electronics Engineers · Engineering & CS',
+    body: `
+<h3>Overview</h3>
+<p>IEEE is the standard for <strong>engineering, computer science, electrical engineering, and technology</strong> papers. Citations are numbered in order of appearance, not alphabetically.</p>
+
+<h4>In-Text Citations</h4>
+<p>Use bracketed numbers in the order you first cite each source.</p>
+<div class="example">The algorithm was first proposed in [1].<br>Several studies confirm this [2], [3], [4].<br>As shown in [1]–[3], the method converges.</div>
+
+<h4>Reference List</h4>
+<p>Titled "References." Numbered list in order cited (not alphabetical). Each number corresponds to the in-text bracket.</p>
+<div class="example"><strong>Journal article:</strong><br>[1] F. Last and F. Last, "Title of article," <em>Abbrev. Journal Name</em>, vol. 1, no. 2, pp. 10–20, Month Year, doi: xxxxx.<br><br><strong>Conference paper:</strong><br>[2] F. Last, "Paper title," in <em>Proc. Conf. Name</em>, City, Country, Year, pp. 1–5.<br><br><strong>Book:</strong><br>[3] F. Last, <em>Title of Book</em>, xth ed. City, Country: Publisher, Year.<br><br><strong>Website:</strong><br>[4] F. Last, "Title," Site Name. [Online]. Available: URL. [Accessed: Day-Mon.-Year].</div>
+
+<h4>Key Rules</h4>
+<ul>
+  <li>Use abbreviated journal names (IEEE standard abbreviations)</li>
+  <li>Author initials before last name: F. M. Last</li>
+  <li>Article titles in "quotation marks," book/journal titles in italics</li>
+  <li>Numbers cited consecutively — [1], [2] never jumps back</li>
+</ul>`
+  },
+  ama: {
+    title: 'AMA Citation Style',
+    subtitle: 'American Medical Association · Medicine & Health Sciences',
+    body: `
+<h3>Overview</h3>
+<p>AMA is used in <strong>medicine, health sciences, biology, and nursing</strong>. Like IEEE, it uses numbered citations in order of appearance.</p>
+
+<h4>In-Text Citations</h4>
+<p>Superscript numbers after punctuation, in order of first citation.</p>
+<div class="example">The treatment was effective.<sup>1</sup><br>Multiple studies agree.<sup>2,3</sup><br>See references 4 through 6.<sup>4-6</sup></div>
+
+<h4>Reference List</h4>
+<p>Titled "References." Numbered in order cited. Authors listed as Last FM (initials, no periods).</p>
+<div class="example"><strong>Journal article:</strong><br>1. Last FM, Last FM. Article title. <em>J Abbrev Name</em>. Year;Volume(Issue):Page-Page. doi:xxxxx<br><br><strong>Book:</strong><br>2. Last FM. <em>Title of Book</em>. xth ed. Publisher; Year.<br><br><strong>Chapter in book:</strong><br>3. Last FM. Chapter title. In: Editor FM, ed. <em>Book Title</em>. Publisher; Year:Page-Page.<br><br><strong>Website:</strong><br>4. Last FM. Page title. Site Name. Published Month Day, Year. Accessed Month Day, Year. URL</div>
+
+<h4>Key Rules</h4>
+<ul>
+  <li>Up to 6 authors listed; if more, list first 3 then "et al."</li>
+  <li>Journal names abbreviated using standard medical abbreviations</li>
+  <li>No space before superscript numbers</li>
+  <li>Semicolons separate volume/issue/pages: 2023;12(3):45-50</li>
+</ul>`
+  },
+  turabian: {
+    title: 'Turabian Style',
+    subtitle: 'A Manual for Writers · Based on Chicago · Student Papers',
+    body: `
+<h3>Overview</h3>
+<p>Turabian is a simplified version of Chicago style designed specifically for <strong>student research papers, theses, and dissertations</strong> in any field. It offers both Notes-Bibliography and Author-Date systems.</p>
+<p>See the <strong>Chicago NB</strong> or <strong>Chicago Author-Date</strong> tabs for full citation examples — Turabian follows the same rules with minor simplifications for student use.</p>
+
+<h4>Key Differences from Chicago</h4>
+<ul>
+  <li>Title pages are standard (Chicago does not require them)</li>
+  <li>Some flexibility in formatting for student submissions</li>
+  <li>Same footnote/bibliography rules as Chicago NB</li>
+  <li>Same author-date rules as Chicago AD</li>
+</ul>
+
+<h4>Title Page</h4>
+<div class="example">Title of Paper<br><br>(Your Name)<br><br>Course Name and Number<br>Professor Name<br>University Name<br>Date</div>`
+  }
+};
+
+function openRefModal(fmt) {
+  const modal = document.getElementById('ref-modal');
+  modal.style.display = 'flex';
+  const data = refContent[fmt] || refContent['mla'];
+  document.getElementById('ref-title').textContent = data.title;
+  document.getElementById('ref-subtitle').textContent = data.subtitle;
+  document.getElementById('ref-body').innerHTML = data.body;
+  document.querySelectorAll('.ref-tab').forEach(t => t.classList.toggle('active', t.dataset.fmt === fmt));
+}
+
+function closeRefModal() {
+  document.getElementById('ref-modal').style.display = 'none';
+}
+
+// Close ref modal on backdrop click
+document.getElementById('ref-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeRefModal();
+});
+
+// ── CHAOS EASTER EGG ──
+let chaosActive = false, chaosBuffer = '', chaosAnim;
+
+editor.addEventListener('keydown', e => {
+  if (e.key.length === 1) {
+    chaosBuffer = (chaosBuffer + e.key.toLowerCase()).slice(-8);
+    if (chaosBuffer.includes('chaoslux')) triggerChaos();
+  }
+});
+
+function triggerChaos() {
+  chaosActive = true;
+  const overlay = document.getElementById('chaos-overlay');
+  const c = document.getElementById('chaos-canvas');
+  overlay.classList.add('active');
+  c.width = window.innerWidth; c.height = window.innerHeight;
+  const ctx = c.getContext('2d');
+  const words = (editor.innerText.trim() || 'chaosLux AesiaLux').split(/\s+/).filter(w => w.length > 0);
+  const particles = words.map(w => ({
+    text: w,
+    x: Math.random() * c.width, y: Math.random() * c.height,
+    vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5,
+    hue: Math.random() * 360,
+    size: 14 + Math.random() * 30,
+    rot: (Math.random() - 0.5) * 0.1
+  }));
+  function loop() {
+    ctx.fillStyle = 'rgba(10,10,15,0.12)';
+    ctx.fillRect(0, 0, c.width, c.height);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < -100) p.x = c.width + 50;
+      if (p.x > c.width + 100) p.x = -50;
+      if (p.y < -50) p.y = c.height + 20;
+      if (p.y > c.height + 50) p.y = -20;
+      p.hue = (p.hue + 0.8) % 360;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.font = `${p.size}px 'Playfair Display', serif`;
+      ctx.fillStyle = `hsl(${p.hue},80%,70%)`;
+      ctx.shadowColor = `hsl(${p.hue},90%,60%)`;
+      ctx.shadowBlur = 16;
+      ctx.fillText(p.text, 0, 0);
+      ctx.restore();
+    });
+    chaosAnim = requestAnimationFrame(loop);
+  }
+  loop();
+  chaosBuffer = '';
+}
+
+function exitChaos() {
+  chaosActive = false;
+  cancelAnimationFrame(chaosAnim);
+  document.getElementById('chaos-overlay').classList.remove('active');
+  document.getElementById('chaos-canvas').getContext('2d').clearRect(0,0,9999,9999);
+  editor.focus();
+}
+
+editor.focus();
+</script>
+</body>
+</html>
