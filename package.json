@@ -1,0 +1,40 @@
+{
+  "name": "aeon-learning-center-app",
+  "productName": "Aeon Learning Center",
+  "version": "1.0.0",
+  "description": "Aeon Learning Center Word Processor",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "lint": "npx eslint . --max-warnings 0",
+    "build": "electron-builder",
+    "make": "electron-builder --publish never"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "electron": "^41.1.0",
+    "electron-builder": "^26.8.1",
+    "eslint": "^10.1.0"
+  },
+  "build": {
+    "appId": "com.aeonlearningcenter.app",
+    "productName": "Aeon Learning Center",
+    "mac": {
+      "target": [
+        "zip"
+      ],
+      "icon": "icon.icns",
+      "category": "public.app-category.productivity",
+      "extraResources": [
+        {
+          "from": "../Aeon Learning Center",
+          "to": "Aeon Learning Center"
+        }
+      ]
+    }
+  }
+}

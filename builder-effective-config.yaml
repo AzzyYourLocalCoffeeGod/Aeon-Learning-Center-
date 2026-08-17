@@ -1,0 +1,15 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.aeonlearningcenter.app
+productName: Aeon Learning Center
+mac:
+  target:
+    - dmg
+  icon: icon.icns
+  category: public.app-category.productivity
+  extraResources:
+    - from: ../Aeon Learning Center
+      to: Aeon Learning Center
+files: []
+electronVersion: 41.1.0

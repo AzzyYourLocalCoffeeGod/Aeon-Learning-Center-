@@ -1,0 +1,18 @@
+import { FlatCompat } from '@eslint/eslintrc';
+
+const compat = new FlatCompat({ baseDirectory: new URL('.', import.meta.url).pathname });
+
+export default [
+  ...compat.extend('eslint:recommended'),
+  {
+    languageOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'module'
+    },
+    rules: {
+      'no-console': 'warn',
+      'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_' }],
+      eqeqeq: 'error'
+    }
+  }
+];
