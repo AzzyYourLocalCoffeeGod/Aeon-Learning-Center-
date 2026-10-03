@@ -69,10 +69,10 @@ body { background:#1e1e21; font-family:'EB Garamond',serif; height:100vh; displa
 #scroll-area::-webkit-scrollbar-thumb { background:#444; border-radius:4px; }
 
 /* PAGE */
-#page { width:min(816px, 100%); min-height:600px; background:var(--page-bg); box-shadow:0 4px 40px rgba(0,0,0,0.35); position:relative; flex-shrink:0; border-radius:2px; }
+#page { width:min(816px, 100%); min-height:1056px; background:var(--page-bg); box-shadow:0 4px 40px rgba(0,0,0,0.35); position:relative; flex-shrink:0; border-radius:2px; }
 
 /* EDITOR — NOTE: -webkit-user-select:text added to fix typing bug */
-#editor { width:100%; min-height:600px; padding:clamp(32px, 6%, 96px); outline:none; font-family:'EB Garamond',serif; font-size:clamp(12pt, 1.8vw, 14pt); line-height:1.8; color:#1a1a1a; caret-color:#c8610a; user-select:text; -webkit-user-select:text; pointer-events:all; }
+#editor { width:100%; min-height:1056px; padding:clamp(32px, 6%, 96px); outline:none; font-family:'EB Garamond',serif; font-size:clamp(12pt, 1.8vw, 14pt); line-height:1.8; color:#1a1a1a; caret-color:#c8610a; user-select:text; -webkit-user-select:text; pointer-events:all; }
 #editor:empty::before { content:'Start typing…'; color:#bbb; pointer-events:none; }
 #editor h1 { font-family:'Playfair Display',serif; font-size:2.4em; font-weight:700; margin:0.6em 0 0.3em; color:#111; }
 #editor h2 { font-family:'Playfair Display',serif; font-size:1.7em; font-weight:400; margin:1em 0 0.3em; color:#222; border-bottom:1px solid #ddd; padding-bottom:6px; }
