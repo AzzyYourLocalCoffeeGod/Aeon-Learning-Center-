@@ -171,12 +171,15 @@ editor.addEventListener('input', () => {
 function applyPageSetting() {
   const ls = document.getElementById('ps-linespacing').value;
   const pw = document.getElementById('ps-pagewidth').value;
+  const pageHeight = document.getElementById('ps-pagewidth').selectedOptions[0].dataset.height || Math.round(Number(pw) * 11 / 8.5);
   const mg = document.getElementById('ps-margins').value;
   const bf = document.getElementById('ps-bodyfont').value;
   editor.style.lineHeight = ls;
   editor.style.fontFamily = bf;
   editor.style.padding = mg + 'px';
   document.getElementById('page').style.width = pw + 'px';
+  document.getElementById('page').style.minHeight = pageHeight + 'px';
+  editor.style.minHeight = pageHeight + 'px';
   document.getElementById('font-family-select').value = bf;
 }
 
