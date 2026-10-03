@@ -8,6 +8,7 @@
     "start": "electron .",
     "lint": "npx eslint . --max-warnings 0",
     "build": "electron-builder",
+    "build:mac": "electron-builder --mac zip --x64 --arm64 --publish never",
     "build:linux": "electron-builder --linux AppImage --publish never",
     "make": "electron-builder --publish never"
   },
@@ -39,6 +40,7 @@
       }
     ],
     "mac": {
+      "minimumSystemVersion": "12.0.0",
       "target": [
         "zip"
       ],
