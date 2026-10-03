@@ -8,6 +8,7 @@
     "start": "electron .",
     "lint": "npx eslint . --max-warnings 0",
     "build": "electron-builder",
+    "build:linux": "electron-builder --linux AppImage --publish never",
     "make": "electron-builder --publish never"
   },
   "keywords": [],
@@ -23,18 +24,31 @@
   "build": {
     "appId": "com.aeonlearningcenter.app",
     "productName": "Aeon Learning Center",
+    "extraResources": [
+      {
+        "from": "renderer",
+        "to": "Aeon Learning Center"
+      },
+      {
+        "from": "icon-linux.png",
+        "to": "icon-linux.png"
+      },
+      {
+        "from": "icon.icns",
+        "to": "icon.icns"
+      }
+    ],
     "mac": {
       "target": [
         "zip"
       ],
       "icon": "icon.icns",
-      "category": "public.app-category.productivity",
-      "extraResources": [
-        {
-          "from": "../Aeon Learning Center",
-          "to": "Aeon Learning Center"
-        }
-      ]
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "icon-linux.png",
+      "category": "Office"
     }
   }
 }
