@@ -2,6 +2,7 @@
 
 const editor = document.getElementById('editor');
 let currentFormat = 'general';
+let columnCount = 1;
 const MAX_OPEN_DOCUMENTS = 16;
 const MAX_RECENT_FILES = 4;
 let openDocuments = [];
@@ -149,11 +150,95 @@ function rememberEditorSelection() {
   if (editor.contains(range.commonAncestorContainer)) savedEditorRange = range.cloneRange();
 }
 
-editor.addEventListener('keyup', () => { updateToolbarState(); rememberEditorSelection(); });
-editor.addEventListener('mouseup', () => { updateToolbarState(); rememberEditorSelection(); });
+editor.addEventListener('keyup', () => { updateToolbarState(); rememberEditorSelection(); updatePageInfo(); });
+editor.addEventListener('mouseup', () => { updateToolbarState(); rememberEditorSelection(); updatePageInfo(); });
 editor.addEventListener('blur', rememberEditorSelection);
 
 // ── STATS ──
+function getPageHeight() {
+  const pageSize = document.getElementById('ps-pagewidth');
+  const selectedHeight = pageSize?.selectedOptions[0]?.dataset.height;
+  const pageWidth = Number(pageSize?.value || 816);
+  return Number(selectedHeight) || Math.round(pageWidth * 11 / 8.5);
+}
+
+function paginateEditor() {
+  editor.querySelectorAll(':scope > [data-aeon-page-spacer]').forEach(spacer => spacer.remove());
+  if (columnCount > 1) return;
+
+  const pageHeight = getPageHeight();
+  const pageGap = 24;
+  const pageStride = pageHeight + pageGap;
+  const editorRect = editor.getBoundingClientRect();
+  const styles = getComputedStyle(editor);
+  const paddingTop = parseFloat(styles.paddingTop) || 0;
+  const paddingBottom = parseFloat(styles.paddingBottom) || 0;
+  const contentHeight = pageHeight - paddingTop - paddingBottom;
+  const spacerPlans = [];
+  let insertedHeight = 0;
+
+  Array.from(editor.children).forEach(block => {
+    const blockRect = block.getBoundingClientRect();
+    if (blockRect.height <= 0 || blockRect.height > contentHeight) return;
+
+    const blockTop = blockRect.top - editorRect.top + insertedHeight;
+    const blockBottom = blockRect.bottom - editorRect.top + insertedHeight;
+    const pageIndex = Math.max(0, Math.floor(Math.max(0, blockTop - paddingTop) / pageStride));
+    const pageContentEnd = pageIndex * pageStride + pageHeight - paddingBottom;
+    if (blockBottom <= pageContentEnd + 1) return;
+
+    const nextPageTop = (pageIndex + 1) * pageStride + paddingTop;
+    const spacerHeight = nextPageTop - blockTop;
+    if (spacerHeight <= 0) return;
+
+    spacerPlans.push({ block, height: spacerHeight });
+    insertedHeight += spacerHeight;
+  });
+
+  spacerPlans.forEach(({ block, height }) => {
+    const spacer = document.createElement('div');
+    spacer.className = 'auto-page-spacer';
+    spacer.dataset.aeonPageSpacer = '';
+    spacer.contentEditable = 'false';
+    spacer.setAttribute('aria-hidden', 'true');
+    spacer.style.height = `${height}px`;
+    block.before(spacer);
+  });
+}
+
+function updatePageInfo() {
+  const pageHeight = getPageHeight();
+  const pageStride = pageHeight + 24;
+  const totalPages = Math.max(1, Math.ceil(editor.scrollHeight / pageStride));
+  let currentPage = 1;
+  const selection = window.getSelection();
+  if (selection?.rangeCount && editor.contains(selection.getRangeAt(0).commonAncestorContainer)) {
+    const range = selection.getRangeAt(0).cloneRange();
+    range.collapse(true);
+    const caret = range.getBoundingClientRect();
+    let caretTop = caret.top;
+    let hasCaretPosition = caret.height > 0;
+    if (!hasCaretPosition) {
+      const container = range.startContainer.nodeType === Node.ELEMENT_NODE
+        ? range.startContainer
+        : range.startContainer.parentElement;
+      const block = container?.closest('p, div, h1, h2, h3, blockquote, li') || container;
+      const blockRect = block?.getBoundingClientRect();
+      if (blockRect?.height) {
+        caretTop = blockRect.top;
+        hasCaretPosition = true;
+      }
+    }
+    if (hasCaretPosition) {
+      currentPage = Math.floor((caretTop - editor.getBoundingClientRect().top) / pageStride) + 1;
+    }
+  }
+  currentPage = Math.max(1, Math.min(currentPage, totalPages));
+  document.getElementById('page-info').textContent = totalPages > 1
+    ? `Page ${currentPage} of ${totalPages}`
+    : 'Page 1';
+}
+
 function updateStats() {
   const text = editor.innerText.trim();
   const words = text === '' ? 0 : text.split(/\s+/).length;
@@ -161,6 +246,7 @@ function updateStats() {
   document.getElementById('char-count').textContent = text.length.toLocaleString() + ' chars';
   document.getElementById('modal-word-count').textContent = words.toLocaleString();
   updateChapterNav();
+  updatePageInfo();
 }
 editor.addEventListener('input', () => {
   syncActiveDocument();
@@ -179,9 +265,31 @@ function applyPageSetting() {
   editor.style.padding = mg + 'px';
   document.getElementById('page').style.width = pw + 'px';
   document.getElementById('page').style.minHeight = pageHeight + 'px';
+  document.getElementById('page').style.setProperty('--page-height', pageHeight + 'px');
   editor.style.minHeight = pageHeight + 'px';
   document.getElementById('font-family-select').value = bf;
+  syncActiveDocument();
+  updatePageInfo();
 }
+
+function normalizeColumnCount(value) {
+  const count = Number(value);
+  return [1, 2, 3].includes(count) ? count : 1;
+}
+
+function applyColumnSetting(value, save = true) {
+  columnCount = normalizeColumnCount(value);
+  editor.style.columnCount = String(columnCount);
+  ['toolbar-columns', 'ps-columns'].forEach(id => {
+    document.getElementById(id).value = String(columnCount);
+  });
+  if (save) syncActiveDocument();
+  else paginateEditor();
+  updatePageInfo();
+}
+
+document.getElementById('scroll-area').addEventListener('scroll', updatePageInfo);
+window.addEventListener('resize', updatePageInfo);
 
 // ── INSERT HELPERS ──
 function insertHR() { document.execCommand('insertHTML', false, '<hr>'); editor.focus(); }
@@ -223,6 +331,52 @@ const templates = {
 <p><br></p>
 <h2>Conclusion</h2>
 <p>Restate thesis in new words. Summarize key points. End with a broader reflection or call to action.</p>`
+  },
+  news: {
+    name: 'News Article',
+    html: `<p style="font-size:10pt;letter-spacing:0.14em;text-transform:uppercase;color:#9a6d25;">NEWS · SECTION</p>
+<h1 style="margin-top:0.3em;">Clear, Specific News Headline</h1>
+<p style="font-size:1.2em;line-height:1.4;color:#555;">A concise deck that adds context and tells readers why this story matters.</p>
+<p style="font-size:0.9em;color:#666;">By Reporter Name · Month Day, Year</p>
+<p style="font-size:0.9em;color:#666;font-style:italic;">CITY — Open with the most important verified fact, followed by who is affected and what happens next.</p>
+<p>Expand on the lead with the strongest supporting detail. Attribute information clearly and explain the context readers need.</p>
+<h2>What happened</h2>
+<p>Describe the key events in a clear timeline. Include specific facts, relevant numbers, and attributed quotes from reliable sources.</p>
+<blockquote>“Add a concise quote that offers useful firsthand perspective,” said Source Name, role or affiliation.</blockquote>
+<h2>What comes next</h2>
+<p>Explain the implications, next steps, and any remaining questions. Link claims to their source and distinguish confirmed facts from estimates.</p>
+<p style="font-size:0.85em;color:#777;"><em>Editor’s note: Add corrections, source notes, or related coverage here when needed.</em></p>`
+  },
+  opinion: {
+    name: 'Opinion / Editorial',
+    html: `<p style="font-size:10pt;letter-spacing:0.14em;text-transform:uppercase;color:#9a6d25;">OPINION · EDITORIAL</p>
+<h1 style="margin-top:0.3em;">Make the Argument Clear in the Headline</h1>
+<p style="font-size:1.2em;line-height:1.4;color:#555;">Summarize your position and its significance in one compelling sentence.</p>
+<p style="font-size:0.9em;color:#666;">By Author Name · Month Day, Year</p>
+<p><strong>State your position.</strong> Open with a focused claim and explain why the issue matters to your readers now.</p>
+<h2>The case for change</h2>
+<p>Develop your strongest reason with specific evidence, examples, or experience. Explain how that evidence supports your central claim.</p>
+<h2>Consider the other side</h2>
+<p>Represent a reasonable counterargument fairly. Respond with evidence and explain any limits or trade-offs in your position.</p>
+<h2>A practical way forward</h2>
+<p>Offer a concrete recommendation. Close by connecting the proposed action to the outcome readers should expect.</p>
+<p style="font-size:0.85em;color:#777;"><em>Disclosure: Note relevant affiliations or interests here.</em></p>`
+  },
+  feature: {
+    name: 'Feature Article',
+    html: `<p style="font-size:10pt;letter-spacing:0.14em;text-transform:uppercase;color:#9a6d25;">FEATURE · SECTION</p>
+<h1 style="margin-top:0.3em;">A Vivid, Inviting Feature Headline</h1>
+<p style="font-size:1.2em;line-height:1.4;color:#555;">A short subheading that hints at the people, place, or idea at the heart of the story.</p>
+<p style="font-size:0.9em;color:#666;">By Author Name · Month Day, Year</p>
+<p>Begin with a scene, person, or surprising detail that draws readers into the story. Ground the opening in specific observation.</p>
+<p>Introduce the central subject and the question or change that gives the story its shape. Let readers know why this is worth their time.</p>
+<h2>Beyond the opening scene</h2>
+<p>Provide context and background. Weave in reporting, examples, and attributed voices without losing the story's throughline.</p>
+<blockquote>“A memorable quote can bring a source's perspective into focus,” said Source Name.</blockquote>
+<h2>A closer look</h2>
+<p>Explore a second dimension of the subject. Add detail, contrast, or a complication that deepens the reader's understanding.</p>
+<h2>Looking ahead</h2>
+<p>End with a resonant observation, image, or implication that feels earned by the story.</p>`
   },
   novel: {
     name: 'Novel',
@@ -526,13 +680,21 @@ function activeDocument() {
   return openDocuments.find(doc => doc.id === activeDocumentId) || null;
 }
 
+function getEditorHtml() {
+  const content = editor.cloneNode(true);
+  content.querySelectorAll(':scope > [data-aeon-page-spacer]').forEach(spacer => spacer.remove());
+  return content.innerHTML;
+}
+
 function syncActiveDocument() {
+  paginateEditor();
   const doc = activeDocument();
   if (!doc) return;
   const wasDirty = doc.dirty;
-  doc.html = editor.innerHTML;
+  doc.html = getEditorHtml();
   doc.format = currentFormat;
-  doc.dirty = doc.html !== doc.savedHtml;
+  doc.columns = columnCount;
+  doc.dirty = doc.html !== doc.savedHtml || doc.columns !== doc.savedColumns;
   if (wasDirty !== doc.dirty) renderDocumentTabs();
 }
 
@@ -594,6 +756,8 @@ function createDocument(options = {}) {
     html,
     savedHtml: options.dirty ? '' : html,
     format: options.format || 'general',
+    columns: normalizeColumnCount(options.columns),
+    savedColumns: options.dirty ? null : normalizeColumnCount(options.columns),
     dirty: Boolean(options.dirty)
   };
   openDocuments.push(doc);
@@ -608,6 +772,8 @@ function activateDocument(id) {
   activeDocumentId = id;
   editor.innerHTML = doc.html;
   currentFormat = doc.format;
+  applyColumnSetting(doc.columns, false);
+  paginateEditor();
   document.getElementById('format-indicator').textContent = currentFormat === 'general' ? '—' : currentFormat;
   updateStats();
   renderDocumentTabs();
@@ -626,6 +792,7 @@ function closeDocument(id) {
     if (replacement) activateDocument(replacement.id);
     else {
       editor.innerHTML = '';
+      applyColumnSetting(1, false);
       updateStats();
       renderDocumentTabs();
     }
@@ -639,7 +806,7 @@ function serializeCurrentDocument(doc, saveAs = false) {
   if (!saveAs && doc.filePath && /\.html?$/i.test(doc.filePath)) {
     return `<!doctype html><html><head><meta charset="utf-8"><title>${doc.name}</title></head><body>${doc.html}</body></html>`;
   }
-  return JSON.stringify({ html: doc.html, text: editor.innerText, format: doc.format, saved: new Date().toISOString() }, null, 2);
+  return JSON.stringify({ html: doc.html, text: editor.innerText, format: doc.format, columns: doc.columns, saved: new Date().toISOString() }, null, 2);
 }
 
 async function saveCurrentDocument(saveAs = false) {
@@ -665,6 +832,7 @@ async function saveCurrentDocument(saveAs = false) {
     doc.filePath = result.filePath;
     doc.name = result.name;
     doc.savedHtml = doc.html;
+    doc.savedColumns = doc.columns;
     doc.dirty = false;
     addToRecent(doc.name, 'scrb', doc.filePath);
     renderDocumentTabs();
@@ -674,6 +842,8 @@ async function saveCurrentDocument(saveAs = false) {
   }
 }
 function saveHtml() {
+  const body = document.body.cloneNode(true);
+  body.querySelector('#editor').innerHTML = getEditorHtml();
   const fullHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -682,14 +852,15 @@ function saveHtml() {
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="aeon-learning-center.css">
 </head>
-<body>${document.documentElement.querySelector('body').innerHTML}</body>
+<body>${body.innerHTML}</body>
 <script src="aeon-learning-center.js"></script>
 </html>`;
   dl(new Blob([fullHtml], {type:'text/html'}), getFilename() + '_full.html');
   showToast('Saved full app + content .html');
 }
 function saveJson() {
-  const data = JSON.stringify({html: editor.innerHTML, text: editor.innerText, format: currentFormat, saved: new Date().toISOString()}, null, 2);
+  syncActiveDocument();
+  const data = JSON.stringify({html: getEditorHtml(), text: editor.innerText, format: currentFormat, columns: columnCount, saved: new Date().toISOString()}, null, 2);
   dl(new Blob([data], {type:'application/json'}), getFilename() + '_aeon_learning_center.json');
   showToast('Saved archive');
 }
@@ -700,10 +871,12 @@ async function saveOfficeExport(format) {
     return;
   }
   try {
+    syncActiveDocument();
     const result = await window.aeonFiles.exportOffice({
       format,
       name: getFilename(),
-      html: editor.innerHTML
+      html: getEditorHtml(),
+      columns: columnCount
     });
     if (result) showToast(`Saved ${format.toUpperCase()} document`);
   } catch (error) {
@@ -726,7 +899,9 @@ function saveDocx() {
 }
 function _doDocxSave() {
   try {
-    const content = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Georgia,serif;font-size:12pt;line-height:1.8;">${editor.innerHTML}</body></html>`;
+    syncActiveDocument();
+    const columnStyle = columnCount > 1 ? `column-count:${columnCount};column-gap:2em;column-rule:1px solid #ddd;` : '';
+    const content = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Georgia,serif;font-size:12pt;line-height:1.8;"><div style="${columnStyle}">${getEditorHtml()}</div></body></html>`;
     const blob = window.htmlDocx.asBlob(content);
     saveAs(blob, getFilename() + '.docx');
     showToast('Saved .docx → check Downloads ✓');
@@ -737,13 +912,14 @@ function _doDocxSave() {
 
 // PDF export via print dialog
 function savePdf() {
+  syncActiveDocument();
   const printWindow = window.open('', '_blank');
   printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=EB+Garamond:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
 <style>
   @page { margin: 1in; size: letter; }
   * { box-sizing: border-box; }
-  body { font-family:'EB Garamond',serif; font-size:12pt; line-height:1.8; color:#000; max-width:100%; }
+  body { font-family:'EB Garamond',serif; font-size:12pt; line-height:1.8; color:#000; max-width:100%; ${columnCount > 1 ? `column-count:${columnCount};column-gap:2em;column-rule:0.5pt solid #ddd;` : ''} }
   h1 { font-family:'Playfair Display',serif; font-size:22pt; font-weight:700; margin:18pt 0 8pt; page-break-after:avoid; }
   h2 { font-family:'Playfair Display',serif; font-size:16pt; font-weight:400; margin:14pt 0 6pt; border-bottom:0.5pt solid #999; padding-bottom:3pt; page-break-after:avoid; }
   h3 { font-family:'Playfair Display',serif; font-size:13pt; font-weight:700; margin:10pt 0 4pt; page-break-after:avoid; }
@@ -751,7 +927,7 @@ function savePdf() {
   p { margin:0 0 8pt; orphans:3; widows:3; }
   hr { border:none; border-top:0.5pt solid #ccc; margin:16pt 0; }
 </style>
-</head><body>${editor.innerHTML}<script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script></body></html>`);
+</head><body>${getEditorHtml()}<script>window.onload=()=>{window.print();window.onafterprint=()=>window.close();}<\/script></body></html>`);
   printWindow.document.close();
   showToast('PDF dialog opened — choose "Save as PDF"');
 }
@@ -787,7 +963,7 @@ function parseOpenedDocument(file) {
     try {
       const data = JSON.parse(file.content);
       if (data && typeof data === 'object' && (data.html || data.text)) {
-        return { html: sanitizeImportedHtml(data.html || `<p>${escapeHtml(data.text)}</p>`), format: data.format || 'general' };
+        return { html: sanitizeImportedHtml(data.html || `<p>${escapeHtml(data.text)}</p>`), format: data.format || 'general', columns: normalizeColumnCount(data.columns) };
       }
     } catch {
       if (extension === 'json') throw new Error('This JSON file is not an Aeon document.');
@@ -810,7 +986,7 @@ function openDocumentData(file) {
     return;
   }
   const parsed = parseOpenedDocument(file);
-  createDocument({ name: file.name, filePath: file.filePath, html: parsed.html, format: parsed.format });
+  createDocument({ name: file.name, filePath: file.filePath, html: parsed.html, format: parsed.format, columns: parsed.columns });
   addToRecent(file.name, 'document', file.filePath);
 }
 

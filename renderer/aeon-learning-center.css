@@ -53,6 +53,9 @@ body { background:#1e1e21; font-family:'EB Garamond',serif; height:100vh; displa
 #font-family-select { width:130px; }
 #font-size-select { width:58px; }
 #font-family-select:focus, #font-size-select:focus { border-color:var(--accent); color:#fff; }
+.toolbar-label { color:rgba(255,255,255,0.4); font-size:10px; }
+.toolbar-select { width:48px; height:28px; padding:3px 5px; border:1px solid rgba(255,255,255,0.1); border-radius:4px; outline:none; background:rgba(0,0,0,0.2); color:rgba(255,255,255,0.7); font-size:12px; cursor:pointer; }
+.toolbar-select:focus { border-color:var(--accent); }
 
 /* COLOR WHEEL PICKERS */
 .color-picker-wrap { display:flex; flex-direction:column; align-items:center; gap:2px; position:relative; cursor:pointer; }
@@ -69,10 +72,11 @@ body { background:#1e1e21; font-family:'EB Garamond',serif; height:100vh; displa
 #scroll-area::-webkit-scrollbar-thumb { background:#444; border-radius:4px; }
 
 /* PAGE */
-#page { width:min(816px, 100%); min-height:1056px; background:var(--page-bg); box-shadow:0 4px 40px rgba(0,0,0,0.35); position:relative; flex-shrink:0; border-radius:2px; }
+#page { --page-height:1056px; --page-gap:24px; width:min(816px, 100%); min-height:1056px; background:repeating-linear-gradient(to bottom, var(--page-bg) 0, var(--page-bg) var(--page-height), #27272b var(--page-height), #27272b calc(var(--page-height) + var(--page-gap))); box-shadow:0 4px 40px rgba(0,0,0,0.35); position:relative; flex-shrink:0; border-radius:2px; }
 
 /* EDITOR — NOTE: -webkit-user-select:text added to fix typing bug */
-#editor { width:100%; min-height:1056px; padding:clamp(32px, 6%, 96px); outline:none; font-family:'EB Garamond',serif; font-size:clamp(12pt, 1.8vw, 14pt); line-height:1.8; color:#1a1a1a; caret-color:#c8610a; user-select:text; -webkit-user-select:text; pointer-events:all; }
+#editor { width:100%; min-height:1056px; padding:clamp(32px, 6%, 96px); outline:none; font-family:'EB Garamond',serif; font-size:clamp(12pt, 1.8vw, 14pt); line-height:1.8; color:#1a1a1a; caret-color:#c8610a; user-select:text; -webkit-user-select:text; pointer-events:all; column-gap:2em; column-rule:1px solid #e5e1d8; }
+#editor .auto-page-spacer { display:block; min-height:0; padding:0; border:0; margin:0; pointer-events:none; user-select:none; }
 #editor:empty::before { content:'Start typing…'; color:#bbb; pointer-events:none; }
 #editor h1 { font-family:'Playfair Display',serif; font-size:2.4em; font-weight:700; margin:0.6em 0 0.3em; color:#111; }
 #editor h2 { font-family:'Playfair Display',serif; font-size:1.7em; font-weight:400; margin:1em 0 0.3em; color:#222; border-bottom:1px solid #ddd; padding-bottom:6px; }

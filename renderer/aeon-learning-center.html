@@ -74,6 +74,11 @@
       <div class="dropdown-label">Document Types</div>
       <div class="dropdown-item" onclick="openFormatModal('templates')">Browse Templates…</div>
       <div class="dropdown-sep"></div>
+      <div class="dropdown-label">Articles</div>
+      <div class="dropdown-item" onclick="applyTemplate('news')">News Article</div>
+      <div class="dropdown-item" onclick="applyTemplate('opinion')">Opinion / Editorial</div>
+      <div class="dropdown-item" onclick="applyTemplate('feature')">Feature Article</div>
+      <div class="dropdown-sep"></div>
       <div class="dropdown-item" onclick="applyTemplate('essay')">Essay (General)</div>
       <div class="dropdown-item" onclick="applyTemplate('novel')">Novel / Fiction</div>
       <div class="dropdown-item" onclick="applyTemplate('chapter')">Multi-Chapter Book</div>
@@ -188,6 +193,13 @@
   <button class="tb-btn" title="Bullets" onclick="fmt('insertUnorderedList')" style="font-size:16px;">≡</button>
   <button class="tb-btn" title="Numbers" onclick="fmt('insertOrderedList')" style="font-size:11px;">1≡</button>
   <div class="tb-sep"></div>
+  <label class="toolbar-label" for="toolbar-columns">Columns</label>
+  <select id="toolbar-columns" class="toolbar-select" aria-label="Text columns" onchange="applyColumnSetting(this.value)">
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+  </select>
+  <div class="tb-sep"></div>
   <button class="tb-btn" title="Templates" onclick="openFormatModal('templates')" style="font-size:10px;width:auto;padding:0 8px;letter-spacing:0.05em;">TEMPLATES</button>
   <button class="tb-btn" title="Chapters" onclick="toggleSidebar()" style="font-size:10px;width:auto;padding:0 8px;letter-spacing:0.05em;">CHAPTERS</button>
   <button class="tb-btn" id="btn-dictionary" title="Dictionary and related words" onclick="toggleDictionaryPanel()" style="font-size:10px;width:auto;padding:0 8px;letter-spacing:0.05em;">DICTIONARY</button>
@@ -281,6 +293,21 @@
           <div class="tc-desc">Academic or personal essay with introduction, body paragraphs, and conclusion structure.</div>
           <div class="tc-preview">Introduction<br>Body Paragraph 1<br>Body Paragraph 2<br>Conclusion</div>
         </div>
+        <div class="template-card" onclick="applyTemplate('news')">
+          <div class="tc-name">📰 News Article</div>
+          <div class="tc-desc">A newsroom-ready structure with headline, deck, byline, dateline, lead, and supporting details.</div>
+          <div class="tc-preview">Headline<br>Deck · Byline<br>Lead<br>Details · Quotes</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('opinion')">
+          <div class="tc-name">✍️ Opinion / Editorial</div>
+          <div class="tc-desc">Build a clear position with supporting arguments, counterpoints, and a closing recommendation.</div>
+          <div class="tc-preview">Position<br>Argument<br>Counterpoint<br>Conclusion</div>
+        </div>
+        <div class="template-card" onclick="applyTemplate('feature')">
+          <div class="tc-name">🗞️ Feature Article</div>
+          <div class="tc-desc">A long-form article outline for narrative openings, context, sections, and a memorable close.</div>
+          <div class="tc-preview">Scene-setting lead<br>Context<br>Sections · Quotes<br>Closing image</div>
+        </div>
         <div class="template-card" onclick="applyTemplate('novel')">
           <div class="tc-name">📖 Novel / Fiction</div>
           <div class="tc-desc">Single-narrative fiction with title page, dedication, and chapter structure.</div>
@@ -352,6 +379,14 @@
             <option value="794" data-height="1123">A4 (210 x 297 mm)</option>
             <option value="700">Narrow</option>
             <option value="960">Wide</option>
+          </select>
+        </div>
+        <div class="fp-row">
+          <label class="fp-label" for="ps-columns">Text Columns</label>
+          <select class="fp-select" id="ps-columns" onchange="applyColumnSetting(this.value)">
+            <option value="1">Single column</option>
+            <option value="2">Two columns</option>
+            <option value="3">Three columns</option>
           </select>
         </div>
         <div class="fp-row">

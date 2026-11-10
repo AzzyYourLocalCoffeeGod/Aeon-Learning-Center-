@@ -77,7 +77,9 @@ ipcMain.handle('aeon:export-office', async (_event, options) => {
   await fs.promises.mkdir(profileDir);
 
   try {
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${baseName}</title><style>body{font-family:"EB Garamond",serif;font-size:12pt;line-height:1.6;color:#1a1a1a}h1,h2,h3{font-family:"Playfair Display",serif}blockquote{border-left:2pt solid #c8a96e;padding-left:12pt;color:#555;font-style:italic}img{max-width:100%;height:auto}</style></head><body>${String(options.html || '')}</body></html>`;
+    const columns = [1, 2, 3].includes(Number(options.columns)) ? Number(options.columns) : 1;
+    const columnStyle = columns > 1 ? `column-count:${columns};column-gap:2em;column-rule:1px solid #ddd;` : '';
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${baseName}</title><style>body{font-family:"EB Garamond",serif;font-size:12pt;line-height:1.6;color:#1a1a1a}h1,h2,h3{font-family:"Playfair Display",serif}blockquote{border-left:2pt solid #c8a96e;padding-left:12pt;color:#555;font-style:italic}img{max-width:100%;height:auto}</style></head><body><div style="${columnStyle}">${String(options.html || '')}</div></body></html>`;
     await fs.promises.writeFile(sourcePath, html, 'utf8');
     const initialFormat = format === 'doc' ? 'odt' : format;
     await execFileAsync('libreoffice', [
