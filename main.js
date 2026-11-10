@@ -155,15 +155,8 @@ function createWindow() {
       contextIsolation: true
     },
     title: 'Aeon Learning Center',
-    icon: iconPath
+    ...(process.platform === 'darwin' ? {} : { icon: iconPath })
   });
-
-  // Set Dock icon for macOS
-  if (process.platform === 'darwin') {
-    if (fs.existsSync(iconPath)) {
-      app.dock.setIcon(iconPath);
-    }
-  }
 
   // Keep the renderer source bundled with the Electron project.
   const sourcePath = app.isPackaged

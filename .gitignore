@@ -1,5 +1,7 @@
 node_modules/
 dist/
+/Aeon Learning Center-*-mac.zip
+/Aeon Learning Center-*-mac.zip.blockmap
 *.icns
 *.png
 !icon-linux.png
